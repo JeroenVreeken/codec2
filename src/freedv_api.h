@@ -48,6 +48,7 @@
 #define FREEDV_MODE_700C        6
 #define FREEDV_MODE_700D        7
 #define FREEDV_MODE_2020        8
+#define FREEDV_MODE_6000	9
 
 
 #ifndef FREEDV_MODE_EN_DEFAULT
@@ -82,6 +83,9 @@
 #endif
 #if !defined(FREEDV_MODE_2020_EN)
         #define FREEDV_MODE_2020_EN FREEDV_MODE_EN_DEFAULT
+#endif
+#if !defined(FREEDV_MODE_6000_EN)
+        #define FREEDV_MODE_6000_EN FREEDV_MODE_EN_DEFAULT
 #endif
 
 #define FDV_MODE_ACTIVE(mode_name, var)  ((mode_name##_EN) == 0 ? 0: (var) == mode_name)

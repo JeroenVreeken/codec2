@@ -42,6 +42,8 @@
 #ifdef __LPCNET__
 #include "lpcnet_freedv.h"
 #endif
+#include "mode6000.h"
+#include "freedv_data_channel.h"
 
 #ifdef __cplusplus
   extern "C" {
@@ -66,7 +68,9 @@ struct freedv {
 #ifdef __LPCNET__
     struct LPCNetFreeDV *lpcnet;
 #endif
-    
+    struct m6000        *m6000;
+    struct freedv_data_channel *fdc;
+
     struct freedv_vhf_deframer * deframer;      // Extracts frames from VHF stream
 
     struct quisk_cfFilter * ptFilter7500to8000; // Filters to change to/from 7500 and 8000 sps for 700 .... 700C

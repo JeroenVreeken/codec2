@@ -196,6 +196,7 @@ set(CODEC2_SRCS
     HRA_112_112.c
     HRAb_396_504.c
     lpcnet_freq.c
+    mode6000.c
 )
 
 set(CODEC2_PUBLIC_HEADERS
