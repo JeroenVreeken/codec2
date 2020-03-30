@@ -108,13 +108,9 @@ struct freedv_data_channel *freedv_data_channel_create(void)
 {
     struct freedv_data_channel *fdc;
   
-    fdc = malloc(sizeof(struct freedv_data_channel));
+    fdc = calloc(1, sizeof(struct freedv_data_channel));
     if (!fdc)
         return NULL;
-
-    fdc->cb_rx = NULL;
-    fdc->cb_tx = NULL;
-    fdc->packet_tx_size = 0;
 
     freedv_data_set_header(fdc, fdc_header_bcast);
 
@@ -216,8 +212,10 @@ void freedv_data_channel_rx_frame(struct freedv_data_channel *fdc, unsigned char
 		memcpy(fdc->packet_rx + 6, tmp, 6);
 		
 		size_t size = fdc->packet_rx_cnt - 2;
-                if (size < 12)
+                if (size < 12) {
                     size = 12;
+		    memcpy(fdc->packet_rx, fdc_header_bcast, 6);
+		}
                 fdc->cb_rx(fdc->cb_rx_state, fdc->packet_rx, size);
             }
         }    
@@ -240,7 +238,7 @@ void freedv_data_channel_tx_frame(struct freedv_data_channel *fdc, unsigned char
         }
 	if (!fdc->packet_tx_size) {
 	    /* Nothing to send, insert a header frame */
-	    memcpy(fdc->packet_tx, fdc->tx_header, size);
+	    memcpy(fdc->packet_tx, fdc->tx_header, 8);
             if (size < 8) {
                 *end_bits = fdc_crc4(fdc->tx_header, size);
                 *crc_bit = 1;
@@ -248,8 +246,8 @@ void freedv_data_channel_tx_frame(struct freedv_data_channel *fdc, unsigned char
 
                 return;
             } else {
-                fdc->packet_tx_size = size;
-            }            
+                fdc->packet_tx_size = 8;
+            }
 	} else {
 	    /* new packet */
 	    unsigned short crc;
