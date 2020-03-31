@@ -514,4 +514,18 @@ endif()
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/unittest
              )
 
+    add_test(NAME test_freedv_data_channel
+             COMMAND sh -c "./tfreedv_data_channel"
+             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/unittest
+             )
+
+    add_test(NAME test_mode6000_mod_demod
+             COMMAND sh -c "./tmode6000 mod 2>tmode6000_testdata.raw && ./tmode6000 demod <tmode6000_testdata.raw"
+             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/unittest
+             )
+    add_test(NAME test_freedv_mode_6000
+             COMMAND sh -c "./tfreedv_mode_6000"
+             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/unittest
+             )
+
 endif(UNITTEST)
