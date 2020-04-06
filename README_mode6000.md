@@ -26,16 +26,16 @@ baud            | 6000    | 720
 inserted 0s     |  600    |  72
 sync bits       |  133.33 |  16
 ----------------|---------|------
-voice bits      | 4666.67 | 560
+voice bits      | 4800    | 576
 used voice bits | 3200    | 384
 codec2 frames   |   50    |   6
-extra data bits |  533.33 |  64
-control bits    |   50    |   6
-reserved bits   |   16.67 |   2
+extra data bits |  400    |  48
+control bits    |   58.33 |   7
+reserved bits   |    8.33 |   1
 ----------------|---------|------
 data frame bits | 5066.67 | 608
 control bits    |   83.33 |  10
-reserved bits   |         |  14
+reserved bits   |  116.67 |  14
 
 
 ## Voice frame

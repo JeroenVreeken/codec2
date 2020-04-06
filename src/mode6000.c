@@ -21,6 +21,8 @@
 #include "mode6000.h"
 #include "freedv_data_channel.h"
 
+#include <assert.h>
+
 #define M6000_RATE		48000
 #define M6000_SYMBOLRATE	6000
 #define M6000_SYMBOLSAMPLES	8
@@ -32,18 +34,18 @@
 #define M6000_INVERT_INTERVAL	10
 #define M6000_INVERTSYMBOLS	(M6000_FRAMESYMBOLS / M6000_INVERT_INTERVAL)
 
-#define M6000_VOICESIZE		560
-#define M6000_VOICEBYTES	70
+#define M6000_VOICESIZE		576
+#define M6000_VOICEBYTES	72
 
 #define M6000_SYNCSIZE		16
 
 /* Slow data:
    from_bit, bcast_bit, 4 end bits, 64 data bits
  */
-#define M6000_SLOWDATABYTES	8
+#define M6000_SLOWDATABYTES	6
 #define M6000_SLOWDATAENDBITS	4
-#define M6000_SLOWDATASIZE	(1+1+4+64)
-#define M6000_RESERVED		(2)
+#define M6000_SLOWDATASIZE	(1+1+1+4+64)
+#define M6000_RESERVED		(1)
 
 /* full data:
    632 total bits: 
@@ -259,6 +261,8 @@ int m6000_mod_data(struct m6000 *m, struct freedv_data_channel *fdc, short *samp
 		m6000_mod_bit(m, 0, samples);
 	}
 
+	assert(m->mod_nr == M6000_FRAMESYMBOLS);
+
 	return 0;
 }
 
@@ -297,9 +301,9 @@ int m6000_mod_codec(struct m6000 *m, struct freedv_data_channel *fdc, short *sam
 	}
 	m6000_mod_bit(m, from_bit, samples);
 	m6000_mod_bit(m, bcast_bit, samples);
+	m6000_mod_bit(m, crc_bit, samples);
 		
 	/* reserved */
-	m6000_mod_bit(m, 0, samples);
 	m6000_mod_bit(m, 0, samples);
 
 	for (byte = 0, byteb = 0; byte < M6000_VOICEBYTES;) {
@@ -313,6 +317,8 @@ int m6000_mod_codec(struct m6000 *m, struct freedv_data_channel *fdc, short *sam
 		}
 	}
 	
+	assert(m->mod_nr == M6000_FRAMESYMBOLS);
+
 	return 0;
 }
 
@@ -382,6 +388,7 @@ static int m6000_demod_frame_voice(struct m6000 *m, struct freedv_data_channel *
 	int end_bits = 0;
 	int from_bit;
 	int bcast_bit;
+	int crc_bit;
 
 	for (byte = 0, byteb = 0; byte < M6000_SLOWDATABYTES;) {
 		bool bit = m6000_demod_frame_bit(m, &nr);
@@ -401,12 +408,12 @@ static int m6000_demod_frame_voice(struct m6000 *m, struct freedv_data_channel *
 	}
 	from_bit = m6000_demod_frame_bit(m, &nr);
 	bcast_bit = m6000_demod_frame_bit(m, &nr);
+	crc_bit = m6000_demod_frame_bit(m, &nr);
 	
 	/* reserved bits */
 	m6000_demod_frame_bit(m, &nr);
-	m6000_demod_frame_bit(m, &nr);
 
-	freedv_data_channel_rx_frame(fdc, databytes, M6000_SLOWDATABYTES, from_bit, bcast_bit, 0, end_bits);
+	freedv_data_channel_rx_frame(fdc, databytes, M6000_SLOWDATABYTES, from_bit, bcast_bit, crc_bit, end_bits);
 
 	memset(voice, 0, M6000_VOICEBYTES);
 	for (byte = 0, byteb = 0; byte < M6000_VOICEBYTES;) {
