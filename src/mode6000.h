@@ -38,4 +38,6 @@ int m6000_get_codec_bytes(struct m6000 *m);
 int m6000_nin(struct m6000 *m);
 void m6000_get_modem_stats(struct m6000 *m, int *sync, float *snr_est);
 
+#define M6000_AMP (16383*2)
+
 #endif /* _MODE6000_H_ */
