@@ -27,9 +27,9 @@ bool const_check_failed = false;
 
 int demod_sync_nr = 0;
 int data_channel_rx_6 = 0;
-int data_channel_rx_76 = 0;
+int data_channel_rx_86 = 0;
 int data_channel_rx_ok_6 = 0;
-int data_channel_rx_ok_76 = 0;
+int data_channel_rx_ok_86 = 0;
 int voice_test_nr = 0;
 
 int ber_checked = 0;
@@ -98,9 +98,9 @@ void freedv_data_channel_rx_frame(struct freedv_data_channel *fdc, unsigned char
 		data_channel_rx_6++;
 		data_channel_rx_ok_6 += ok;
 	}
-	if (size == 76) {
-		data_channel_rx_76++;
-		data_channel_rx_ok_76 += ok;
+	if (size == 86) {
+		data_channel_rx_86++;
+		data_channel_rx_ok_86 += ok;
 	}
 	
 	printf(" %d %d %d\n", from_bit, bcast_bit, end_bits);
@@ -127,7 +127,7 @@ void m6000_test_voice_gen(unsigned char *voice)
 {
 	int i;
 	
-	for (i = 0; i < 72; i++) {
+	for (i = 0; i < 81; i++) {
 		voice[i] = i + 'v';
 	}
 }
@@ -137,7 +137,7 @@ void m6000_test_voice(unsigned char *voice)
 	int i;
 	int r = 1;
 	
-	for (i = 0; i < 72; i++) {
+	for (i = 0; i < 81; i++) {
 		unsigned char expected = i + 'v';
 		unsigned char value = voice[i];
 		int bit;
@@ -198,8 +198,8 @@ int main(int argc, char **argv)
 
 	printf("m6000_get_codec_bytes() ");
 	int codec_bytes = m6000_get_codec_bytes(m6000);
-	if (codec_bytes != 72) {
-		printf("codec bytes is not 72: %d\n", codec_bytes);
+	if (codec_bytes != 81) {
+		printf("codec bytes is not 81: %d\n", codec_bytes);
 		const_check_failed = true;
 	} else {
 		printf("Passed\n");
@@ -232,7 +232,7 @@ int main(int argc, char **argv)
 	}
 	
 	short frame[m6000_get_n_max_modem_samples(m6000)];
-	unsigned char voice[72] = {0};
+	unsigned char voice[81] = {0};
 	if (test_mod) {
 		for (i = 0; i < NR_FRAMES; i++) {
 			if (i&1) {
@@ -253,6 +253,8 @@ int main(int argc, char **argv)
 			printf("Read %d samples\n", nin);
 			int r = fread(frame, sizeof(short), nin, stdin);
 			cont = (r == nin);
+			if (!cont)
+				continue;
 
 			int r_d = m6000_demod(m6000, NULL, frame, voice);
 			
@@ -282,10 +284,10 @@ int main(int argc, char **argv)
 			printf("RX failed due to to little 6 byte frames\n");
 			rx_check_failed = true;
 		}
-		printf("Demod received %d (out of %d) frames with 76 data bytes\n", 
-		    data_channel_rx_ok_76, data_channel_rx_76);
-		if (data_channel_rx_ok_76 < (NR_FRAMES/2)-1) {
-			printf("RX failed due to to little 76 byte frames\n");
+		printf("Demod received %d (out of %d) frames with 86 data bytes\n", 
+		    data_channel_rx_ok_86, data_channel_rx_86);
+		if (data_channel_rx_ok_86 < (NR_FRAMES/2)-1) {
+			printf("RX failed due to to little 86 byte frames\n");
 			rx_check_failed = true;
 		}
 		printf("Demod received %d correct voice frames\n", voice_test_nr);

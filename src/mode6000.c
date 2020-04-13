@@ -16,7 +16,6 @@
   along with this program; if not, see <http://www.gnu.org/licenses/>.
 */
 #include <stdlib.h>
-#include <stdio.h>
 #include <string.h>
 #include <math.h>
 #include "mode6000.h"
@@ -32,13 +31,13 @@
 #define M6000_FRAMESIZEMIN	(M6000_FRAMESIZE - 8)
 #define M6000_FRAMEBUF		(M6000_SYMBOLSAMPLES * 2)
 #define M6000_FRAMESYMBOLS	((M6000_FRAMESIZE * M6000_SYMBOLRATE)/M6000_RATE)
-#define M6000_INVERT_INTERVAL	10
-#define M6000_INVERTSYMBOLS	(M6000_FRAMESYMBOLS / M6000_INVERT_INTERVAL)
 
-#define M6000_INVERTSYMBOLS_MIN	((M6000_INVERTSYMBOLS * 3) / 4)
+#define M6000_VOICESIZE		648
+#define M6000_VOICEBYTES	81
 
-#define M6000_VOICESIZE		576
-#define M6000_VOICEBYTES	72
+//4800: 576 128 -8: 120 15
+//5200: 624 80 -8: 72 9
+//5400: 648 56 -8: 48 6
 
 #define M6000_SYNCSIZE		16
 #define M6000_SYNCSIZE_MIN	12
@@ -48,43 +47,83 @@
  */
 #define M6000_SLOWDATABYTES	6
 #define M6000_SLOWDATAENDBITS	4
-#define M6000_SLOWDATASIZE	(1+1+1+4+64)
+#define M6000_SLOWDATASIZE	(1+1+1+4+48)
 #define M6000_RESERVED		(1)
 
 /* full data:
-   632 total bits: 
-   76 databytes ->608
+   704 total bits: 
+   86 databytes ->688
    8 endbits
    from bit
    bcast bit
-   14 spare
+   6 spare
  */
-#define M6000_FULLDATABYTES	76
+#define M6000_FULLDATABYTES	86
 #define M6000_FULLDATAENDBITS	8
-#define M6000_FULLDATASPARE	14
-#define M6000_FULLDATASIZE	(632)
+#define M6000_FULLDATASPARE	6
+#define M6000_FULLDATASIZE	(704)
 
 /* Sync words for voice and data frames
    Choosen such that they 'break' false syncs.
  */
  
 static bool m6000_sync_voice[M6000_SYNCSIZE] = {
-	/*sync*/ 0, 1, 0, 1, 0, 1, 1, 1, 1,
-	/*sync*/ 1, 0, 1, 0, 1, 0, 0,
+	/*sync*/ 0, 0, 0, 0, 1, 0, 1, 0,  1, 1, 0, 1, 1, 0, 1, 0,
 };
 
 static bool m6000_sync_data[M6000_SYNCSIZE] = {
-	/*sync*/ 0, 0, 1, 1, 1, 0, 0, 1, 1,
-	/*sync*/ 1, 1, 0, 1, 0, 1, 1,
+	/*sync*/ 0, 0, 0, 0, 1, 1, 0, 1,  1, 0, 1, 0, 1, 1, 0, 1,
 };
 
-static float m6000_bit_shape[M6000_SYMBOLSAMPLES] = {
+static float m6000_sym_demod_shape[M6000_SYMBOLSAMPLES] = {
 	0.1464461, 0.5, 0.85355339, 1.0, 0.85355339, 0.5, 0.1464461, 0,
 };
-#define M6000_BIT_SHAPE_SQ	2.98
-#define M6000_THRESHOLD_FAC	(1/(M6000_BIT_SHAPE_SQ * 3))	// derived by experiment....
+
+/* raised cosine bit */
+/*
+#define M6000_SYMBOLSHAPELEN	4
+#define M6000_SYMBOLSHAPESAMPLES (M6000_SYMBOLSAMPLES * M6000_SYMBOLSHAPELEN)
+static float m6000_sym_shape[M6000_SYMBOLSHAPESAMPLES] = {
+	0,		0,		0, 		0, 	0, 		0,	 	0, 		0,
+	0.038060234, 	0.1464461,	0.30865828,	0.5,	0.69134172,	0.85355339,	0.96193977,	1.0,
+	0.96193977,	0.85355339, 	0.69134172,	0.5,	0.30865828,	0.1464461,	0.038060234,	0,
+	0, 		0, 		0, 		0,	0,		0, 		0, 		0,
+};
+*/
+
+/* root raised cosine B 0.5*/
+/*#define M6000_SYMBOLSHAPELEN	8
+#define M6000_SYMBOLSHAPESAMPLES (M6000_SYMBOLSAMPLES * M6000_SYMBOLSHAPELEN)
+static float m6000_sym_shape[M6000_SYMBOLSHAPESAMPLES] = {
+	-0.009855,	-0.006644,	-0.000407,	0.007169,	0.013682,	0.016747,	0.014825,	0.007894,
+	-0.002296,	-0.012526,	-0.018970,	-0.018421,	-0.009543,	0.006242,	0.024592,	0.038983,
+	0.042317,	0.029067,	-0.002552,	-0.048980,	-0.100834,	-0.143862,	-0.161319,	-0.137371,
+	-0.060857,	0.071447,	0.252888,	0.466877,	0.688905,	0.890356,	1.043398,	1.125998,
+	1.125998,	1.043398,	0.890356,	0.688905,	0.466877,	0.252888,	0.071447,	-0.060857,
+	-0.137371,	-0.161319,	-0.143862,	-0.100834,	-0.048980,	-0.002552,	0.029067,	0.042317,
+	0.038983,	0.024592,	0.006242,	-0.009543,	-0.018421,	-0.018970,	-0.012526,	-0.002296,
+	0.007894,	0.014825,	0.016747,	0.013682,	0.007169,	-0.000407,	-0.006644	-0.009855
+};
+*/
+
+/* raised cosine B 0.5*/
+#define M6000_SYMBOLSHAPELEN	8
+#define M6000_SYMBOLSHAPESAMPLES (M6000_SYMBOLSAMPLES * M6000_SYMBOLSHAPELEN)
+static float m6000_sym_shape[M6000_SYMBOLSHAPESAMPLES] = {
+0.001082,	0.003279,	0.005025,	0.005794,	0.005327,	0.003777,	0.001758,	0.000237,	
+0.000272,	0.002641,	0.007460,	0.013885,	0.020036,	0.023216,	0.020438,	0.009209,	
+-0.011582,	-0.040858,	-0.074862,	-0.107153,	-0.129197,	-0.131538,	-0.105397,	-0.044441,	
+0.053616,	0.185913,	0.344125,	0.515065,	0.682183,	0.827760,	0.935439,	0.992680,	
+0.992680,	0.935439,	0.827760,	0.682183,	0.515065,	0.344125,	0.185913,	0.053616,	
+-0.044441,	-0.105397,	-0.131538,	-0.129197,	-0.107153,	-0.074862,	-0.040858,	-0.011582,	
+0.009209,	0.020438,	0.023216,	0.020036,	0.013885,	0.007460,	0.002641,	0.000272,	
+0.000237,	0.001758,	0.003777,	0.005327,	0.005794,	0.005025,	0.003279,	0.001082,	
+};
+
 
 #define M6000_DEMOD_BIN_DECAY	0.99
+
+#define M6000_SCRAMBLER_SEED	0x4a80
 
 enum m6000_sync {
 	M6000_SYNC_LOST,
@@ -94,7 +133,8 @@ enum m6000_sync {
 struct m6000 {
 	/* modulator */
 	
-	bool mod_bit;
+	bool mod_bit[M6000_SYMBOLSHAPELEN];
+	int mod_bit_nr;
 	int mod_nr;
 
 
@@ -108,7 +148,6 @@ struct m6000 {
 	int demod_bin_selected;
 	int demod_symbol_nr;
 	float demod_symval;
-	float demod_threshold;
 
 	enum m6000_sync demod_sync;
 	int demod_sync_nr;
@@ -189,35 +228,32 @@ int m6000_nin(struct m6000 *m)
 
 static int m6000_mod_symbol(struct m6000 *m, bool bit, short *samples)
 {
+	int sym;
+	int i;
+	bool new_bit = !bit ^ m->mod_bit[m->mod_bit_nr];
+	m->mod_bit_nr++;
+	m->mod_bit_nr %= M6000_SYMBOLSHAPELEN;
+	m->mod_bit[m->mod_bit_nr] = new_bit;
+	
+	float val[M6000_SYMBOLSHAPESAMPLES] = {0};
+	
+	for (sym = 0; sym < M6000_SYMBOLSHAPELEN; sym++) {
+		int bit_i = (m->mod_bit_nr + M6000_SYMBOLSHAPELEN - sym) % M6000_SYMBOLSHAPELEN;
+		
+		float amp = m->mod_bit[bit_i] ? M6000_AMP : - M6000_AMP;
+		
+		for (i = 0; i < M6000_SYMBOLSAMPLES; i++) {
+			val[i] += amp * m6000_sym_shape[sym * M6000_SYMBOLSAMPLES + i];
+		}
+	}
+
+	
 	samples += m->mod_nr * 8;
 
-	float val = M6000_AMP;
-	if (m->mod_bit) {
-		val = -M6000_AMP;
+	for (i = 0; i < M6000_SYMBOLSAMPLES; i++) {
+		samples[i] = val[i];
 	}
-	
-	if (bit) {
-		samples[0] = val;
-		samples[1] = val;
-		samples[2] = val;
-		samples[3] = val;
-		samples[4] = val;
-		samples[5] = val;
-		samples[6] = val;
-		samples[7] = val;
-	} else {
-		samples[0] = val * 0.92388;
-		samples[1] = val * 0.70711;
-		samples[2] = val * 0.38268;
-		samples[3] = 0;
-		samples[4] = val * -0.38268;
-		samples[5] = val * -0.70711;
-		samples[6] = val * -0.92388;
-		samples[7] = val * -1.0;
-	
-		m->mod_bit = !m->mod_bit;
-	}
-	
+
 	m->mod_nr++;
 
 	return M6000_SYMBOLSAMPLES;
@@ -225,10 +261,16 @@ static int m6000_mod_symbol(struct m6000 *m, bool bit, short *samples)
 
 static void m6000_mod_bit(struct m6000 *m, bool bit, short *samples)
 {
-	if ((m->mod_nr % M6000_INVERT_INTERVAL) == 0) {
-		m6000_mod_symbol(m, false, samples);
-	}
 	m6000_mod_symbol(m, bit, samples);
+}
+
+static void m6000_mod_bit_scrambled(struct m6000 *m, bool bit, unsigned short *scrambler, short *samples)
+{
+	bool scrambler_bit = ((*scrambler & 0x2) >> 1) ^ (*scrambler & 0x1);
+	*scrambler >>= 1;
+	*scrambler |= scrambler_bit << 14;
+	
+	m6000_mod_bit(m, bit ^ scrambler_bit, samples);
 }
 
 int m6000_mod_data(struct m6000 *m, struct freedv_data_channel *fdc, short *samples)
@@ -239,6 +281,7 @@ int m6000_mod_data(struct m6000 *m, struct freedv_data_channel *fdc, short *samp
 	for (i = 0; i < sizeof (m6000_sync_data)/sizeof(m6000_sync_data[0]); i++) {
 		m6000_mod_bit(m, m6000_sync_data[i], samples);
 	}
+	unsigned short scrambler = M6000_SCRAMBLER_SEED;
 
 	unsigned char databytes[M6000_FULLDATABYTES] = { 0 };
 	int end_bits;
@@ -253,7 +296,7 @@ int m6000_mod_data(struct m6000 *m, struct freedv_data_channel *fdc, short *samp
 
 	for (byte = 0, byteb = 0; byte < M6000_FULLDATABYTES;) {
 		bool bit = (databytes[byte] >> (7 - byteb)) & 1;
-		m6000_mod_bit(m, bit, samples);
+		m6000_mod_bit_scrambled(m, bit, &scrambler, samples);
 		
 		byteb++;
 		if (byteb > 7) {
@@ -263,13 +306,13 @@ int m6000_mod_data(struct m6000 *m, struct freedv_data_channel *fdc, short *samp
 	}
 	for (byteb = 0; byteb < M6000_FULLDATAENDBITS; byteb++) {
 		bool bit = (end_bits >> (7 - byteb)) & 1;
-		m6000_mod_bit(m, bit, samples);
+		m6000_mod_bit_scrambled(m, bit, &scrambler, samples);
 	}
-	m6000_mod_bit(m, from_bit, samples);
-	m6000_mod_bit(m, bcast_bit, samples);
+	m6000_mod_bit_scrambled(m, from_bit, &scrambler, samples);
+	m6000_mod_bit_scrambled(m, bcast_bit, &scrambler, samples);
 	
 	for (i = 0; i < M6000_FULLDATASPARE; i++) {
-		m6000_mod_bit(m, 0, samples);
+		m6000_mod_bit_scrambled(m, 0, &scrambler, samples);
 	}
 
 	assert(m->mod_nr == M6000_FRAMESYMBOLS);
@@ -285,6 +328,7 @@ int m6000_mod_codec(struct m6000 *m, struct freedv_data_channel *fdc, short *sam
 	for (i = 0; i < sizeof (m6000_sync_voice)/sizeof(m6000_sync_voice[0]); i++) {
 		m6000_mod_bit(m, m6000_sync_voice[i], samples);
 	}
+	unsigned short scrambler = M6000_SCRAMBLER_SEED;
 
 	unsigned char databytes[M6000_SLOWDATABYTES] = { 0 };
 	int end_bits;
@@ -298,7 +342,7 @@ int m6000_mod_codec(struct m6000 *m, struct freedv_data_channel *fdc, short *sam
 
 	for (byte = 0, byteb = 0; byte < M6000_SLOWDATABYTES;) {
 		bool bit = (databytes[byte] >> (7 - byteb)) & 1;
-		m6000_mod_bit(m, bit, samples);
+		m6000_mod_bit_scrambled(m, bit, &scrambler, samples);
 			
 		byteb++;
 		if (byteb > 7) {
@@ -308,18 +352,18 @@ int m6000_mod_codec(struct m6000 *m, struct freedv_data_channel *fdc, short *sam
 	}
 	for (byteb = 0; byteb < M6000_SLOWDATAENDBITS; byteb++) {
 		bool bit = (end_bits >> (3 - byteb)) & 1;
-		m6000_mod_bit(m, bit, samples);
+		m6000_mod_bit_scrambled(m, bit, &scrambler, samples);
 	}
-	m6000_mod_bit(m, from_bit, samples);
-	m6000_mod_bit(m, bcast_bit, samples);
-	m6000_mod_bit(m, crc_bit, samples);
+	m6000_mod_bit_scrambled(m, from_bit, &scrambler, samples);
+	m6000_mod_bit_scrambled(m, bcast_bit, &scrambler, samples);
+	m6000_mod_bit_scrambled(m, crc_bit, &scrambler, samples);
 		
 	/* reserved */
-	m6000_mod_bit(m, 0, samples);
+	m6000_mod_bit_scrambled(m, 0, &scrambler, samples);
 
 	for (byte = 0, byteb = 0; byte < M6000_VOICEBYTES;) {
 		bool bit = (voice[byte] >> (7 - byteb)) & 1;
-		m6000_mod_bit(m, bit, samples);
+		m6000_mod_bit_scrambled(m, bit, &scrambler, samples);
 		
 		byteb++;
 		if (byteb > 7) {
@@ -327,7 +371,7 @@ int m6000_mod_codec(struct m6000 *m, struct freedv_data_channel *fdc, short *sam
 			byte++;
 		}
 	}
-	
+
 	assert(m->mod_nr == M6000_FRAMESYMBOLS);
 
 	return 0;
@@ -335,13 +379,19 @@ int m6000_mod_codec(struct m6000 *m, struct freedv_data_channel *fdc, short *sam
 
 static bool m6000_demod_frame_bit(struct m6000 *m, int *nr)
 {
-	if ((*nr % M6000_INVERT_INTERVAL) == 0) {
-		*nr = *nr + 1;
-	}
 	int bit_index = (m->demod_sync_nr + *nr) % M6000_FRAMESYMBOLS;
 	bool bit = m->demod_symbols[bit_index];
 	*nr = *nr + 1;
 	return bit;
+}
+
+static bool m6000_demod_frame_bit_scrambled(struct m6000 *m, int *nr, unsigned short *scrambler)
+{
+	bool scrambler_bit = ((*scrambler & 0x2) >> 1) ^ (*scrambler & 0x1);
+	*scrambler >>= 1;
+	*scrambler |= scrambler_bit << 14;
+	
+	return m6000_demod_frame_bit(m, nr) ^ scrambler_bit;
 }
 
 static int m6000_demod_frame_data(struct m6000 *m, struct freedv_data_channel *fdc)
@@ -353,6 +403,7 @@ static int m6000_demod_frame_data(struct m6000 *m, struct freedv_data_channel *f
 	for (i = 0; i < sizeof (m6000_sync_voice)/sizeof(bool); i++) {
 		m6000_demod_frame_bit(m, &nr);
 	}
+	unsigned short scrambler = M6000_SCRAMBLER_SEED;
 	
 	int byte;
 	int byteb;
@@ -361,7 +412,7 @@ static int m6000_demod_frame_data(struct m6000 *m, struct freedv_data_channel *f
 	int bcast_bit;
 
 	for (byte = 0, byteb = 0; byte < M6000_FULLDATABYTES;) {
-		bool bit = m6000_demod_frame_bit(m, &nr);
+		bool bit = m6000_demod_frame_bit_scrambled(m, &nr, &scrambler);
 		
 		databytes[byte] |= bit << (7 - byteb);
 			
@@ -372,12 +423,12 @@ static int m6000_demod_frame_data(struct m6000 *m, struct freedv_data_channel *f
 		}
 	}
 	for (byteb = 0; byteb < M6000_FULLDATAENDBITS; byteb++) {
-		bool bit = m6000_demod_frame_bit(m, &nr);
+		bool bit = m6000_demod_frame_bit_scrambled(m, &nr, &scrambler);
 
 		end_bits |= bit << (7 - byteb);
 	}
-	from_bit = m6000_demod_frame_bit(m, &nr);
-	bcast_bit = m6000_demod_frame_bit(m, &nr);
+	from_bit = m6000_demod_frame_bit_scrambled(m, &nr, &scrambler);
+	bcast_bit = m6000_demod_frame_bit_scrambled(m, &nr, &scrambler);
 
 	freedv_data_channel_rx_frame(fdc, databytes, M6000_FULLDATABYTES, from_bit, bcast_bit, 0, end_bits);
 
@@ -393,6 +444,7 @@ static int m6000_demod_frame_voice(struct m6000 *m, struct freedv_data_channel *
 	for (i = 0; i < sizeof (m6000_sync_voice)/sizeof(bool); i++) {
 		m6000_demod_frame_bit(m, &nr);
 	}
+	unsigned short scrambler = M6000_SCRAMBLER_SEED;
 	
 	int byte;
 	int byteb;
@@ -402,7 +454,7 @@ static int m6000_demod_frame_voice(struct m6000 *m, struct freedv_data_channel *
 	int crc_bit;
 
 	for (byte = 0, byteb = 0; byte < M6000_SLOWDATABYTES;) {
-		bool bit = m6000_demod_frame_bit(m, &nr);
+		bool bit = m6000_demod_frame_bit_scrambled(m, &nr, &scrambler);
 		
 		databytes[byte] |= bit << (7 - byteb);
 			
@@ -413,22 +465,22 @@ static int m6000_demod_frame_voice(struct m6000 *m, struct freedv_data_channel *
 		}
 	}
 	for (byteb = 0; byteb < M6000_SLOWDATAENDBITS; byteb++) {
-		bool bit = m6000_demod_frame_bit(m, &nr);
+		bool bit = m6000_demod_frame_bit_scrambled(m, &nr, &scrambler);
 
 		end_bits |= bit << (3 - byteb);
 	}
-	from_bit = m6000_demod_frame_bit(m, &nr);
-	bcast_bit = m6000_demod_frame_bit(m, &nr);
-	crc_bit = m6000_demod_frame_bit(m, &nr);
+	from_bit = m6000_demod_frame_bit_scrambled(m, &nr, &scrambler);
+	bcast_bit = m6000_demod_frame_bit_scrambled(m, &nr, &scrambler);
+	crc_bit = m6000_demod_frame_bit_scrambled(m, &nr, &scrambler);
 	
 	/* reserved bits */
-	m6000_demod_frame_bit(m, &nr);
+	m6000_demod_frame_bit_scrambled(m, &nr, &scrambler);
 
 	freedv_data_channel_rx_frame(fdc, databytes, M6000_SLOWDATABYTES, from_bit, bcast_bit, crc_bit, end_bits);
 
 	memset(voice, 0, M6000_VOICEBYTES);
 	for (byte = 0, byteb = 0; byte < M6000_VOICEBYTES;) {
-		bool bit = m6000_demod_frame_bit(m, &nr);
+		bool bit = m6000_demod_frame_bit_scrambled(m, &nr, &scrambler);
 		
 		voice[byte] |= bit << (7 - byteb);
 			
@@ -461,41 +513,49 @@ int m6000_demod(struct m6000 *m, struct freedv_data_channel *fdc, short *samples
 		int bin = sample_nr % M6000_SYMBOLSAMPLES;
 		
 		m->demod_bin[bin] *= M6000_DEMOD_BIN_DECAY;
-		if (signbit(sample) != signbit(prev_sample))
+		if (signbit(sample) != signbit(prev_sample)) {
 			m->demod_bin[bin] += 1.0;
+		}
 
 		int bin_selected = m->demod_bin_selected;
-		int bin_sample = (bin_selected + M6000_SYMBOLSAMPLES/2) % M6000_SYMBOLSAMPLES;
+		int bin_zerosync = (bin_selected + M6000_SYMBOLSAMPLES/2 - 1) % M6000_SYMBOLSAMPLES;
 		
-		if (bin == bin_sample) {
-			int bin_prev = (bin_selected + M6000_FRAMEBUF - 1) % M6000_SYMBOLSAMPLES;
-			int bin_next = (bin_selected + 1) % M6000_SYMBOLSAMPLES;
-
-			if (offset > -M6000_SYMBOLSAMPLES  && m->demod_bin[bin_prev] > m->demod_bin[bin_selected]) {
-				m->demod_bin_selected = bin_prev;
+		if (bin == bin_zerosync) {
+			float max = 0;
+			int off_max = 0;
+			int j;
+			for (j = -M6000_SYMBOLSAMPLES/2; j < M6000_SYMBOLSAMPLES; j++) {
+				int bin_i = (bin_selected + M6000_SYMBOLSAMPLES + j) % M6000_SYMBOLSAMPLES;
+				if (m->demod_bin[bin_i] > max) {
+					max = m->demod_bin[bin_i];
+					off_max = j;
+				}
+			}
+			if (offset > -M6000_SYMBOLSAMPLES  && off_max < 0) {
+				m->demod_bin_selected = (m->demod_bin_selected -1 + M6000_SYMBOLSAMPLES) % M6000_SYMBOLSAMPLES;
 				offset--;
 			}
-			if (offset < M6000_SYMBOLSAMPLES && m->demod_bin[bin_next] > m->demod_bin[bin_selected]) {
-				m->demod_bin_selected = bin_next;
-				bin_sample = bin_next;
+			if (offset < M6000_SYMBOLSAMPLES && off_max > 0) {
+				m->demod_bin_selected = (m->demod_bin_selected + 1) % M6000_SYMBOLSAMPLES;
 				offset++;
 			}
 		}
+		int bin_sample = (m->demod_bin_selected + M6000_SYMBOLSAMPLES/2) % M6000_SYMBOLSAMPLES;
+
 		if (bin == bin_sample) {
 			int sample_off;
 			float symval = 0;
 			int sym_i;
+
 			for (sym_i = 0; sym_i < M6000_SYMBOLSAMPLES; sym_i++) {
 				sample_off = M6000_FRAMEBUF - M6000_SYMBOLSAMPLES - M6000_SYMBOLSAMPLES/2 + sym_i;
 				int sample_i = (sample_nr + sample_off) % M6000_FRAMEBUF;
 				float sym_sample = m->demod_samples[sample_i];
 
-				symval += (sym_sample - m->demod_threshold) * m6000_bit_shape[sym_i];
+				symval += sym_sample * m6000_sym_demod_shape[sym_i];
 			}
 
-
 			bool symbit = signbit(symval) == signbit(m->demod_symval);
-			m->demod_threshold = copysign(symval, symval) * M6000_THRESHOLD_FAC;
 
 			m->demod_symval = symval;
 			
@@ -507,66 +567,47 @@ int m6000_demod(struct m6000 *m, struct freedv_data_channel *fdc, short *samples
 			
 			if ((m->demod_sync == M6000_SYNC_LOST) ||
 			    (m->demod_sync == M6000_SYNC_FRAME && m->demod_sync_nr == sym_nr)) {
-				int bit_i;
-				int int_ok = 0;
-				for (bit_i = 0; bit_i < M6000_FRAMESYMBOLS; bit_i += M6000_INVERT_INTERVAL) {
-					int index = (sym_nr + bit_i) % M6000_FRAMESYMBOLS;
-					if (!m->demod_symbols[index])
-						int_ok++;
-				}
-				bool interval_ok = false;
-				if (m->demod_sync == M6000_SYNC_LOST && int_ok == M6000_INVERTSYMBOLS)
-					interval_ok = true;
-				if (m->demod_sync == M6000_SYNC_FRAME && int_ok > M6000_INVERTSYMBOLS_MIN)
-					interval_ok = true;
-
-				if (interval_ok) {
-					int bit_pos = 0;
-					int sym_pos = 0;
-					int bit_sync_voice = 0;
-					int bit_sync_data = 0;
+				int bit_pos;
+				int bit_sync_voice = 0;
+				int bit_sync_data = 0;
 				
-					for (; bit_pos < M6000_SYNCSIZE; bit_pos++, sym_pos++) {
-						if ((sym_pos % M6000_INVERT_INTERVAL) == 0)
-							sym_pos++;
-						int bit_index = sym_pos + sym_nr;
-						bit_index = bit_index % M6000_FRAMESYMBOLS;
-						bool bitval = m->demod_symbols[bit_index];
-						
-						if (m6000_sync_voice[bit_pos] == bitval)
-							bit_sync_voice++;
-						if (m6000_sync_data[bit_pos] == bitval)
-							bit_sync_data++;
-					}
+				for (bit_pos = 0; bit_pos < M6000_SYNCSIZE; bit_pos++) {
+					int bit_index = (sym_nr + bit_pos) % M6000_FRAMESYMBOLS;
+					bool bitval = m->demod_symbols[bit_index];
 					
-					int bit_sync_min;
-					if (m->demod_sync == M6000_SYNC_LOST)
-						bit_sync_min = M6000_SYNCSIZE;
-					else
-						bit_sync_min = M6000_SYNCSIZE_MIN;
+					if (m6000_sync_voice[bit_pos] == bitval)
+						bit_sync_voice++;
+					if (m6000_sync_data[bit_pos] == bitval)
+						bit_sync_data++;
+				}
+					
+				int bit_sync_min;
+				if (m->demod_sync == M6000_SYNC_LOST)
+					bit_sync_min = M6000_SYNCSIZE;
+				else
+					bit_sync_min = M6000_SYNCSIZE_MIN;
 
-					bool is_sync_voice = false;
-					bool is_sync_data = false;
+				bool is_sync_voice = false;
+				bool is_sync_data = false;
 
-					if (bit_sync_voice >= bit_sync_min && bit_sync_voice > bit_sync_data)
-							is_sync_voice = true;
-					if (bit_sync_data >= bit_sync_min && bit_sync_data > bit_sync_voice)
-							is_sync_data = true;
+				if (bit_sync_voice >= bit_sync_min && bit_sync_voice > bit_sync_data)
+						is_sync_voice = true;
+				if (bit_sync_data >= bit_sync_min && bit_sync_data > bit_sync_voice)
+						is_sync_data = true;
 
-					if (is_sync_voice || is_sync_data) {
-						m->demod_sync = M6000_SYNC_FRAME;
-						m->demod_sync_nr = sym_nr;
-					} else {
-						m->demod_sync = M6000_SYNC_LOST;
-					}
-					if (is_sync_data)
-						m6000_demod_frame_data(m, fdc);
-					if (is_sync_voice) {
-						ret = m6000_demod_frame_voice(m, fdc, voice);
-					}
+				if (is_sync_voice || is_sync_data) {
+					m->demod_sync = M6000_SYNC_FRAME;
+					m->demod_sync_nr = sym_nr;
+				} else {
+					m->demod_sync = M6000_SYNC_LOST;
+				}
+				if (is_sync_data)
+					m6000_demod_frame_data(m, fdc);
+				if (is_sync_voice) {
+					ret = m6000_demod_frame_voice(m, fdc, voice);
 				}
 			}
-		}
+		};
 	}
 
 	m->demod_nin = M6000_FRAMESIZE + offset;
