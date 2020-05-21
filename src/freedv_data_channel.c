@@ -253,9 +253,11 @@ void freedv_data_channel_tx_frame(struct freedv_data_channel *fdc, unsigned char
 	    /* new packet */
 	    unsigned short crc;
             unsigned char tmp[6];
-            
-            *from_bit = !memcmp(fdc->packet_tx + 6, fdc->tx_header, 6);
-            *bcast_bit = !memcmp(fdc->packet_tx, fdc_header_bcast, 6);
+	    /* Do not use short header if the packet fits in a single frame */
+	    int short_header = fdc->packet_tx_size > size - 2;
+	    
+            *from_bit = short_header && !memcmp(fdc->packet_tx + 6, fdc->tx_header, 6);
+            *bcast_bit = short_header && !memcmp(fdc->packet_tx, fdc_header_bcast, 6);
 
             memcpy(tmp, fdc->packet_tx, 6);
 	    memcpy(fdc->packet_tx, fdc->packet_tx + 6, 6);
