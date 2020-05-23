@@ -1,4 +1,6 @@
 /*
+  freedv_6000.c     A 6000 baud FSK mode
+  
   Copyright (C) 2020 Jeroen Vreeken <jeroen@vreeken.net>
 
   This library is free software; you can redistribute it and/or
@@ -18,10 +20,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-#include "mode6000.h"
-#include "freedv_data_channel.h"
+#include "freedv_6000.h"
+#include "freedv_api_internal.h"
 
 #include <assert.h>
+
+#define M6000_AMP (16383)
+
 
 #define M6000_RATE		48000
 #define M6000_SYMBOLRATE	6000
@@ -151,79 +156,40 @@ struct m6000 {
 
 	enum m6000_sync demod_sync;
 	int demod_sync_nr;
-	int demod_nin;
 };
 
-struct m6000 *m6000_create(void)
+void freedv_6000_open(struct freedv *f) 
 {
-	struct m6000 *m = calloc(1, sizeof(struct m6000));
+    /* Create modem */
+    f->m6000 = calloc(1, sizeof(struct m6000));
 
-	/* Make sure we don't 'sync' on initial state */
-	memset(m->demod_symbols, 1, sizeof(m->demod_symbols));
+    /* Make sure we don't 'sync' on initial state */
+    memset(f->m6000->demod_symbols, 1, sizeof(f->m6000->demod_symbols));
 
-	m->demod_nin = M6000_FRAMESIZEMAX;
+    f->nin = M6000_FRAMESIZEMAX;
+    f->fdc = freedv_data_channel_create();
 
-	return m;
+    f->n_nom_modem_samples = M6000_FRAMESIZE;
+    f->n_max_modem_samples = M6000_FRAMESIZEMAX;
+    f->n_nat_modem_samples = M6000_FRAMESIZE;
+    f->modem_sample_rate = M6000_RATE;
+    f->modem_symbol_rate = M6000_SYMBOLRATE;
+
+    /* Malloc something to appease freedv_init and freedv_destroy */
+    f->codec_bits = malloc(1);
+
+    f->stats.sync = 0;
 }
 
-void m6000_destroy(struct m6000 *m)
+void freedv_6000_close(struct freedv *f)
 {
-	free(m);
+    freedv_data_channel_destroy(f->fdc);
+    free(f->m6000);
 }
 
-int m6000_get_modem_sample_rate(struct m6000 *m)
-{
-	return M6000_RATE;
-}
-
-int m6000_get_modem_symbol_rate(struct m6000 *m)
-{
-	return M6000_SYMBOLRATE;
-}
-
-int m6000_get_n_nom_modem_samples(struct m6000 *m)
-{
-	return M6000_FRAMESIZE;
-}
-
-int m6000_get_n_max_modem_samples(struct m6000 *m)
-{
-	return M6000_FRAMESIZEMAX;
-}
-
-int m6000_get_codec_bytes(struct m6000 *m)
+int freedv_6000_get_codec_bytes(struct freedv *f)
 {
 	return M6000_VOICEBYTES;
-}
-
-void m6000_get_modem_stats(struct m6000 *m, int *sync, float *snr_est)
-{
-	if (sync) {
-		switch (m->demod_sync) {
-		   case M6000_SYNC_LOST:
-		   	*sync = 0;
-			break;
-		   case M6000_SYNC_FRAME:
-		   	*sync = 1;
-			break;
-		}
-	}
-	if (snr_est) {
-		float min = 1000.0;
-		float max = 0.0;
-		
-		int i;
-		for (i = 0; i < M6000_SYMBOLSAMPLES; i++) {
-			min = fminf(m->demod_bin[i], min);
-			max = fmaxf(m->demod_bin[i], max);
-		}
-		*snr_est = 10.0 * log10f(max/min);
-	}
-}
-
-int m6000_nin(struct m6000 *m)
-{
-	return m->demod_nin;
 }
 
 static int m6000_mod_symbol(struct m6000 *m, bool bit, short *samples)
@@ -273,8 +239,10 @@ static void m6000_mod_bit_scrambled(struct m6000 *m, bool bit, unsigned short *s
 	m6000_mod_bit(m, bit ^ scrambler_bit, samples);
 }
 
-int m6000_mod_data(struct m6000 *m, struct freedv_data_channel *fdc, short *samples)
+int freedv_6000_datatx(struct freedv *f, short *samples)
 {
+	struct freedv_data_channel *fdc = f->fdc;
+	struct m6000 *m = f->m6000;
 	m->mod_nr = 0;
 	int i;
 	
@@ -320,8 +288,11 @@ int m6000_mod_data(struct m6000 *m, struct freedv_data_channel *fdc, short *samp
 	return 0;
 }
 
-int m6000_mod_codec(struct m6000 *m, struct freedv_data_channel *fdc, short *samples, unsigned char *voice)
+int freedv_6000_codectx(struct freedv *f, short *samples)
 {
+	struct m6000 *m = f->m6000;
+	struct freedv_data_channel *fdc = f->fdc;
+	unsigned char *voice = f->packed_codec_bits;
 	m->mod_nr = 0;
 	int i;
 	
@@ -494,9 +465,12 @@ static int m6000_demod_frame_voice(struct m6000 *m, struct freedv_data_channel *
 	return M6000_VOICEBYTES;
 }
 
-int m6000_demod(struct m6000 *m, struct freedv_data_channel *fdc, short *samples, unsigned char *voice)
+int freedv_6000_codecrx(struct freedv *f, short *samples)
 {
-	int nin = m->demod_nin;
+	struct m6000 *m = f->m6000;
+	struct freedv_data_channel *fdc = f->fdc;
+	unsigned char *voice = f->packed_codec_bits;
+	int nin = f->nin;
 	int i;
 	int offset = 0;
 	int ret = 0;
@@ -610,7 +584,25 @@ int m6000_demod(struct m6000 *m, struct freedv_data_channel *fdc, short *samples
 		};
 	}
 
-	m->demod_nin = M6000_FRAMESIZE + offset;
+	f->nin = M6000_FRAMESIZE + offset;
+
+	switch (m->demod_sync) {
+	   case M6000_SYNC_LOST:
+	   	f->stats.sync = 0;
+		break;
+	   case M6000_SYNC_FRAME:
+	   	f->stats.sync = 1;
+		break;
+	}
+
+	float min = 1000.0;
+	float max = 0.0;
+		
+	for (i = 0; i < M6000_SYMBOLSAMPLES; i++) {
+		min = fminf(m->demod_bin[i], min);
+		max = fmaxf(m->demod_bin[i], max);
+	}
+	f->stats.snr_est = 10.0 * log10f(max/min);
 	
 	return ret;
 }

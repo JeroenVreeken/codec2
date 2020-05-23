@@ -19,7 +19,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "mode6000.h"
+#include "freedv_6000.h"
+#include "freedv_data_channel.h"
 
 bool rx_check = true;
 bool rx_check_failed = false;
@@ -137,7 +138,7 @@ void m6000_test_voice(unsigned char *voice)
 	int i;
 	int r = 1;
 	
-	for (i = 0; i < 81; i++) {
+	for (i = 0; i < 48; i++) {
 		unsigned char expected = i + 'v';
 		unsigned char value = voice[i];
 		int bit;
@@ -165,12 +166,12 @@ void m6000_test_voice(unsigned char *voice)
 
 int main(int argc, char **argv)
 {
-	struct m6000 *m6000 = m6000_create();
-
+	struct freedv *f = freedv_open(FREEDV_MODE_6000);
+	
 	printf("Mode 6000 modem tests\n");
 	
-	printf("Check m6000_get_modem_sample_rate() ");
-	int m_rate = m6000_get_modem_sample_rate(m6000);
+	printf("Check freedv_get_modem_sample_rate() ");
+	int m_rate = freedv_get_modem_sample_rate(f);
 	if (m_rate != 48000) {
 		printf("modemrate is not 48000\n");
 		const_check_failed = true;
@@ -178,8 +179,8 @@ int main(int argc, char **argv)
 		printf("Passed\n");
 	}
 	
-	printf("m6000_get_modem_symbol_rate() ");
-	int m_symbolrate = m6000_get_modem_symbol_rate(m6000);
+	printf("freedv_get_modem_symbol_rate() ");
+	int m_symbolrate = freedv_get_modem_symbol_rate(f);
 	if (m_symbolrate != 6000) {
 		printf("symbolrate is not 6000\n");
 		const_check_failed = true;
@@ -187,8 +188,8 @@ int main(int argc, char **argv)
 		printf("Passed\n");
 	}
 
-	printf("m6000_get_n_nom_modem_samples() ");
-	int m_framesize = m6000_get_n_nom_modem_samples(m6000);
+	printf("freedv_get_n_nom_modem_samples() ");
+	int m_framesize = freedv_get_n_nom_modem_samples(f);
 	if (m_framesize != 5760) {
 		printf("framesize is not 5760: %d\n", m_framesize);
 		const_check_failed = true;
@@ -196,15 +197,6 @@ int main(int argc, char **argv)
 		printf("Passed\n");
 	}
 
-	printf("m6000_get_codec_bytes() ");
-	int codec_bytes = m6000_get_codec_bytes(m6000);
-	if (codec_bytes != 81) {
-		printf("codec bytes is not 81: %d\n", codec_bytes);
-		const_check_failed = true;
-	} else {
-		printf("Passed\n");
-	}
-	
 	int i;
 	
 	bool test_mod = false;
@@ -231,32 +223,32 @@ int main(int argc, char **argv)
 		printf("Skipping mod test, to execute run: 'tmode6000 mod 2>testdata.raw'\n");
 	}
 	
-	short frame[m6000_get_n_max_modem_samples(m6000)];
+	short frame[freedv_get_n_max_modem_samples(f)];
 	unsigned char voice[81] = {0};
 	if (test_mod) {
 		for (i = 0; i < NR_FRAMES; i++) {
 			if (i&1) {
-				m6000_mod_data(m6000, NULL, frame);
+				freedv_datatx(f, frame);
 			} else {
 				m6000_test_voice_gen(voice);
-				m6000_mod_codec(m6000, NULL, frame, voice);
+				freedv_codectx(f, frame, voice);
 			}
 			
-			fwrite(frame, m6000_get_n_nom_modem_samples(m6000), sizeof(short), stderr);
+			fwrite(frame, freedv_get_n_nom_modem_samples(f), sizeof(short), stderr);
 		}
 	}
 	
 	if (test_demod) {
 		bool cont = true;
 		while (cont) {
-			int nin = m6000_nin(m6000);
+			int nin = freedv_nin(f);
 			printf("Read %d samples\n", nin);
 			int r = fread(frame, sizeof(short), nin, stdin);
 			cont = (r == nin);
 			if (!cont)
 				continue;
 
-			int r_d = m6000_demod(m6000, NULL, frame, voice);
+			int r_d = freedv_codecrx(f, voice, frame);
 			
 			printf("demod: %d\n", r_d);
 			if (r_d)
@@ -264,7 +256,7 @@ int main(int argc, char **argv)
 
 			int sync;
 			float snr_est;
-			m6000_get_modem_stats(m6000, &sync, &snr_est);
+			freedv_get_modem_stats(f, &sync, &snr_est);
 
 			if (sync)
 				demod_sync_nr++;

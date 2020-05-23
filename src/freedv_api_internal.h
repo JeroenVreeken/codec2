@@ -42,7 +42,7 @@
 #ifdef __LPCNET__
 #include "lpcnet_freedv.h"
 #endif
-#include "mode6000.h"
+#include "freedv_6000.h"
 #include "freedv_data_channel.h"
 
 #ifdef __cplusplus

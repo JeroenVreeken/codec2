@@ -58,8 +58,8 @@ target_link_libraries(tst_codec2_fft_init m codec2)
 
 add_executable(tvq_mbest tvq_mbest.c)
 
-add_executable(tmode6000 tmode6000.c ../src/mode6000.c)
-target_link_libraries(tmode6000 m)
+add_executable(tmode6000 tmode6000.c)
+target_link_libraries(tmode6000 m codec2)
 
 add_executable(tfreedv_mode_6000 tfreedv_mode_6000.c)
 target_link_libraries(tfreedv_mode_6000 codec2)

@@ -184,6 +184,7 @@ set(CODEC2_SRCS
     freedv_1600.c
     freedv_700.c
     freedv_2020.c
+    freedv_6000.c
     freedv_fsk.c
     freedv_vhf_framing.c
     freedv_data_channel.c
@@ -200,7 +201,6 @@ set(CODEC2_SRCS
     HRA_112_112.c
     HRAb_396_504.c
     lpcnet_freq.c
-    mode6000.c
 )
 
 set(CODEC2_PUBLIC_HEADERS
