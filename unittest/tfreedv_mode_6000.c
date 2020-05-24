@@ -153,6 +153,7 @@ int main(int argc, char **argv)
 	int codec_bits = freedv_get_bits_per_modem_frame(f);
 	if (codec_bits != 384) {
 		printf("Expected 384 codec bits, got %d\n", codec_bits);
+		goto fail;
 	}
 	printf("Passed\n");
 
@@ -160,6 +161,7 @@ int main(int argc, char **argv)
 	int sync = freedv_get_sync(f);
 	if (sync) {
 		printf("sync value %d was unexpected\n", sync);
+		goto fail;
 	}
 	printf("Passed\n");
 
@@ -168,9 +170,11 @@ int main(int argc, char **argv)
 	freedv_get_modem_stats(f, &sync, &snr_est);
 	if (sync) {
 		printf("sync value %d was unexpected\n", sync);
+		goto fail;
 	}
 	if (snr_est > 1.0) {
 		printf("snr_est value %f was unexpected\n", snr_est);
+		goto fail;
 	}
 	printf("Passed\n");	
 

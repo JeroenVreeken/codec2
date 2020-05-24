@@ -25,6 +25,6 @@ void freedv_6000_close(struct freedv *f);
 
 int freedv_6000_datatx(struct freedv *f, short *samples);
 int freedv_6000_rawdatatx(struct freedv *f, short *samples);
-int freedv_6000_rawdatarx(struct freedv *f, short *samples);
+int freedv_comprx_6000(struct freedv *f, COMP demod_in[]);
 
 #endif /* _FREEDV_6000_H_ */

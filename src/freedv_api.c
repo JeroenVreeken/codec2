@@ -528,7 +528,8 @@ int freedv_rx(struct freedv *f, short speech_out[], short demod_in[]) {
     assert(nin <= f->n_max_modem_samples);
        
     /* FSK RX happens in real floats, so convert to those and call their demod here */
-    if( (FDV_MODE_ACTIVE( FREEDV_MODE_2400A, f->mode)) || (FDV_MODE_ACTIVE( FREEDV_MODE_2400B, f->mode)) || (FDV_MODE_ACTIVE( FREEDV_MODE_800XA, f->mode)) ){
+    if( (FDV_MODE_ACTIVE( FREEDV_MODE_2400A, f->mode)) || (FDV_MODE_ACTIVE( FREEDV_MODE_2400B, f->mode)) || 
+        (FDV_MODE_ACTIVE( FREEDV_MODE_800XA, f->mode)) || (FDV_MODE_ACTIVE( FREEDV_MODE_6000, f->mode)) ) {
         float rx_float[f->n_max_modem_samples];
         for(i=0; i<nin; i++) {
             rx_float[i] = ((float)demod_in[i]);
@@ -556,11 +557,6 @@ int freedv_rx(struct freedv *f, short speech_out[], short demod_in[]) {
         return freedv_shortrx(f, speech_out, demod_in, gain);
     }
     
-
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_6000, f->mode)) {
-        f->rx_status = freedv_6000_rawdatarx(f, demod_in);
-        return freedv_bits_to_speech(f, speech_out, demod_in, f->rx_status);
-    }
 
     assert(1); /* should never get here */
     return 0;
@@ -593,6 +589,9 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
 #ifdef __LPCNET__
         rx_status = freedv_comprx_2020(f, demod_in);
 #endif
+    }
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_6000, f->mode)) {
+        rx_status = freedv_comprx_6000(f, demod_in);
     }
 
     short demod_in_short[f->nin_prev];
@@ -808,16 +807,6 @@ int freedv_rawdatarx(struct freedv *f, unsigned char *packed_payload_bits, short
 
     f->nin_prev = nin;
     
-    if (FDV_MODE_ACTIVE( FREEDV_MODE_6000, f->mode)) {
-        rx_status = freedv_6000_rawdatarx(f, demod_in);
-	f->rx_status = rx_status;
-	if (rx_status & RX_BITS) {
-            ret = (f->bits_per_modem_frame + 7 ) / 8;
-            memcpy(packed_payload_bits, f->rx_payload_bits, ret);
-	}
-	return ret;
-    }
-
     COMP rx_fdm[f->n_max_modem_samples];
     
     for(i=0; i<nin; i++) {
@@ -834,6 +823,16 @@ int freedv_rawdatarx(struct freedv *f, unsigned char *packed_payload_bits, short
             memcpy(packed_payload_bits, f->rx_payload_bits, ret);
         }
         return ret;
+    }
+
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_6000, f->mode)) {
+        rx_status = freedv_comprx_6000(f, rx_fdm);
+	f->rx_status = rx_status;
+	if (rx_status & RX_BITS) {
+            ret = (f->bits_per_modem_frame + 7 ) / 8;
+            memcpy(packed_payload_bits, f->rx_payload_bits, ret);
+	}
+	return ret;
     }
 
     if (FDV_MODE_ACTIVE( FREEDV_MODE_1600, f->mode)) rx_status = freedv_comprx_fdmdv_1600(f, rx_fdm);

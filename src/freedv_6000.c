@@ -470,7 +470,7 @@ static int m6000_demod_frame_voice(struct m6000 *m, struct freedv_data_channel *
     return M6000_VOICEBYTES;
 }
 
-int freedv_6000_rawdatarx(struct freedv *f, short *samples)
+int freedv_comprx_6000(struct freedv *f, COMP demod_in[])
 {
     struct m6000 *m = f->m6000;
     struct freedv_data_channel *fdc = f->fdc;
@@ -481,7 +481,7 @@ int freedv_6000_rawdatarx(struct freedv *f, short *samples)
     int ret = 0;
     
     for (i = 0; i < nin; i++) {
-        float sample = (float)samples[i] / M6000_AMP;
+        float sample = demod_in[i].real / M6000_AMP;
         int prev_sample_nr = m->demod_sample_nr;
         float prev_sample = m->demod_samples[prev_sample_nr];
         int sample_nr = (prev_sample_nr + 1) % M6000_FRAMEBUF;
