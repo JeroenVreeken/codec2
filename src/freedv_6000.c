@@ -156,7 +156,7 @@ struct m6000 {
     int demod_symbol_nr;
     float demod_symval;
 
-    enum m6000_sync demod_sync;
+    int rx_status;
     int demod_sync_nr;
 };
 
@@ -544,8 +544,8 @@ int freedv_comprx_6000(struct freedv *f, COMP demod_in[])
             m->demod_symbol_nr = sym_nr;
             m->demod_symbols[sym_nr] = symbit;
             
-            if ((m->demod_sync == M6000_SYNC_LOST) ||
-                (m->demod_sync == M6000_SYNC_FRAME && m->demod_sync_nr == sym_nr)) {
+            if ((m->rx_status & RX_SYNC) == 0 ||
+                ((m->rx_status & RX_SYNC) && m->demod_sync_nr == sym_nr)) {
                 int bit_pos;
                 int bit_sync_voice = 0;
                 int bit_sync_data = 0;
@@ -561,7 +561,7 @@ int freedv_comprx_6000(struct freedv *f, COMP demod_in[])
                 }
                     
                 int bit_sync_min;
-                if (m->demod_sync == M6000_SYNC_LOST)
+                if ((m->rx_status & RX_SYNC) == 0)
                     bit_sync_min = M6000_SYNCSIZE;
                 else
                     bit_sync_min = M6000_SYNCSIZE_MIN;
@@ -575,10 +575,10 @@ int freedv_comprx_6000(struct freedv *f, COMP demod_in[])
                         is_sync_data = true;
 
                 if (is_sync_voice || is_sync_data) {
-                    m->demod_sync = M6000_SYNC_FRAME;
+                    m->rx_status = RX_SYNC;
                     m->demod_sync_nr = sym_nr;
                 } else {
-                    m->demod_sync = M6000_SYNC_LOST;
+                    m->rx_status = 0;
                 }
                 if (is_sync_data)
                     m6000_demod_frame_data(m, fdc);
@@ -591,14 +591,7 @@ int freedv_comprx_6000(struct freedv *f, COMP demod_in[])
 
     f->nin = M6000_FRAMESIZE + offset;
 
-    switch (m->demod_sync) {
-       case M6000_SYNC_LOST:
-           f->stats.sync = 0;
-        break;
-       case M6000_SYNC_FRAME:
-           f->stats.sync = 1;
-        break;
-    }
+    f->stats.sync = (m->rx_status & RX_SYNC) != 0;
 
     float min = 1000.0;
     float max = 0.0;
@@ -609,9 +602,7 @@ int freedv_comprx_6000(struct freedv *f, COMP demod_in[])
     }
     f->stats.snr_est = 10.0 * log10f(max/min);
 
-    int rx_status = 0;
-    if (m->demod_sync == M6000_SYNC_FRAME)
-        rx_status |= RX_SYNC;
+    int rx_status = m->rx_status;
     if (ret)
         rx_status |= RX_BITS;
     return rx_status;
