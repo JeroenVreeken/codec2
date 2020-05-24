@@ -231,7 +231,7 @@ int main(int argc, char **argv)
 				freedv_datatx(f, frame);
 			} else {
 				m6000_test_voice_gen(voice);
-				freedv_codectx(f, frame, voice);
+				freedv_rawdatatx(f, frame, voice);
 			}
 			
 			fwrite(frame, freedv_get_n_nom_modem_samples(f), sizeof(short), stderr);
@@ -248,7 +248,7 @@ int main(int argc, char **argv)
 			if (!cont)
 				continue;
 
-			int r_d = freedv_codecrx(f, voice, frame);
+			int r_d = freedv_rawdatarx(f, voice, frame);
 			
 			printf("demod: %d\n", r_d);
 			if (r_d)

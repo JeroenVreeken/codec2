@@ -75,12 +75,14 @@ void voice_gen(unsigned char *voicedata)
 int voice_check(unsigned char *voicedata)
 {
 	int i;
+	int ret = 0;
 	for (i = 0; i < 384/8; i++) {
 		if (voicedata[i] != i + 'v') {
 			printf("voice byte %d does not match: 0x%02x != 0x%02x\n", i, voicedata[i], i + 'v');
+			ret++;
 		}
 	}
-	return 0;
+	return ret;
 }
 
 int main(int argc, char **argv)
@@ -148,7 +150,7 @@ int main(int argc, char **argv)
 	printf("Passed\n");
 	
 	printf("freedv_get_n_codec_bits() ");
-	int codec_bits = freedv_get_n_codec_bits(f);
+	int codec_bits = freedv_get_bits_per_modem_frame(f);
 	if (codec_bits != 384) {
 		printf("Expected 384 codec bits, got %d\n", codec_bits);
 	}
@@ -203,10 +205,10 @@ int main(int argc, char **argv)
 	}
 	printf("Passed\n");  /* store: D DDDDDDDDD */
 
-	printf("multiple freedv_codectx() ");
+	printf("multiple freedv_rawdatatx() ");
 	voice_gen(packed_codec_bits);
 	for (i = 0; i < 11; i++) {
-		freedv_codectx(f, mod_out, packed_codec_bits);
+		freedv_rawdatatx(f, mod_out, packed_codec_bits);
 		tfreedv_mode6000_mod_store(mod_out, 5760);
 	}
 	printf("Passed\n"); /* store: D DDDDDDDDD VVVVVVVVVVV */
@@ -235,10 +237,10 @@ int main(int argc, char **argv)
 	}
 	printf("Passed\n");
 	
-	printf("freedv_codecrx() ");
+	printf("freedv_rawdatarx() ");
 	nin = freedv_nin(f);
 	short *demod_in = tfreedv_mode6000_mod_get(nin);
-	int r = freedv_codecrx(f, packed_codec_bits, demod_in);
+	int r = freedv_rawdatarx(f, packed_codec_bits, demod_in);
 	if (r) {
 		printf("Expected only data, no voice: r = %d\n", r);
 		goto fail;
@@ -248,13 +250,13 @@ int main(int argc, char **argv)
 	}
 	printf("Passed\n"); /* store: d DDDDDDDDD VVVVVVVVVVV V DDD */
 
-	printf("multiple freedv_codecrx() [data] ");
+	printf("multiple freedv_rawdatarx() [data] ");
 	datarx_called = 0;
 	datarx_from_ok = 0;
 	for (i = 0; i < 9; i++) {
 		nin = freedv_nin(f);
 		demod_in = tfreedv_mode6000_mod_get(nin);
-		r = freedv_codecrx(f, packed_codec_bits, demod_in);
+		r = freedv_rawdatarx(f, packed_codec_bits, demod_in);
 		if (r) {
 			printf("Expected only data, no voice: r = %d\n", r);
 			goto fail;
@@ -281,10 +283,10 @@ int main(int argc, char **argv)
 	}
 	printf("Passed\n");
 	
-	printf("freedv_codecrx() [last data frame] ");
+	printf("freedv_rawdatarx() [last data frame] ");
 	nin = freedv_nin(f);
 	demod_in = tfreedv_mode6000_mod_get(nin);
-	r = freedv_codecrx(f, packed_codec_bits, demod_in);
+	r = freedv_rawdatarx(f, packed_codec_bits, demod_in);
 	if (r) {
 		printf("Expected only data, no voice: r = %d\n", r);
 		goto fail;
@@ -292,14 +294,14 @@ int main(int argc, char **argv)
 	printf("Passed\n"); /* store: . ......... vVVVVVVVVVV V DDD */
 
 
-	printf("multiple freedv_codecrx() [voice] ");
+	printf("multiple freedv_rawdatarx() [voice] ");
 	datarx_called = 0;
 	datarx_from_ok = 0;
 	for (i = 0; i < 10; i++) {
 		nin = freedv_nin(f);
 		demod_in = tfreedv_mode6000_mod_get(nin);
 		memset(packed_codec_bits, 0, 384/8);
-		r = freedv_codecrx(f, packed_codec_bits, demod_in);
+		r = freedv_rawdatarx(f, packed_codec_bits, demod_in);
 		if (r != 384/8) {
 			printf("Expected voice: r = %d\n", r);
 			goto fail;

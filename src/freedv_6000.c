@@ -22,6 +22,8 @@
 #include <math.h>
 #include "freedv_6000.h"
 #include "freedv_api_internal.h"
+#include "codec2.h"
+#include "debug_alloc.h"
 
 #include <assert.h>
 
@@ -160,6 +162,9 @@ struct m6000 {
 
 void freedv_6000_open(struct freedv *f) 
 {
+    f->codec2 = codec2_create(CODEC2_MODE_3200);
+    assert(f->codec2 != NULL);
+    
     /* Create modem */
     f->m6000 = calloc(1, sizeof(struct m6000));
 
@@ -174,9 +179,14 @@ void freedv_6000_open(struct freedv *f)
     f->n_nat_modem_samples = M6000_FRAMESIZE;
     f->modem_sample_rate = M6000_RATE;
     f->modem_symbol_rate = M6000_SYMBOLRATE;
+    f->n_speech_samples = 6*codec2_samples_per_frame(f->codec2);
+    f->n_codec_frames = 6;
+    f->bits_per_codec_frame = codec2_bits_per_frame(f->codec2);
+    f->bits_per_modem_frame = f->n_codec_frames * f->bits_per_codec_frame;
 
-    /* Malloc something to appease freedv_init and freedv_destroy */
-    f->codec_bits = malloc(1);
+    int n_packed_bytes = M6000_VOICEBYTES;
+    f->tx_payload_bits = CALLOC(1, n_packed_bytes); assert(f->tx_payload_bits != NULL);
+    f->rx_payload_bits = CALLOC(1, n_packed_bytes); assert(f->rx_payload_bits != NULL);
 
     f->stats.sync = 0;
 }
@@ -185,11 +195,6 @@ void freedv_6000_close(struct freedv *f)
 {
     freedv_data_channel_destroy(f->fdc);
     free(f->m6000);
-}
-
-int freedv_6000_get_codec_bytes(struct freedv *f)
-{
-    return M6000_VOICEBYTES;
 }
 
 static int m6000_mod_symbol(struct m6000 *m, bool bit, short *samples)
@@ -288,11 +293,11 @@ int freedv_6000_datatx(struct freedv *f, short *samples)
     return 0;
 }
 
-int freedv_6000_codectx(struct freedv *f, short *samples)
+int freedv_6000_rawdatatx(struct freedv *f, short *samples)
 {
     struct m6000 *m = f->m6000;
     struct freedv_data_channel *fdc = f->fdc;
-    unsigned char *voice = f->packed_codec_bits;
+    unsigned char *voice = f->tx_payload_bits;
     m->mod_nr = 0;
     int i;
     
@@ -465,11 +470,11 @@ static int m6000_demod_frame_voice(struct m6000 *m, struct freedv_data_channel *
     return M6000_VOICEBYTES;
 }
 
-int freedv_6000_codecrx(struct freedv *f, short *samples)
+int freedv_6000_rawdatarx(struct freedv *f, short *samples)
 {
     struct m6000 *m = f->m6000;
     struct freedv_data_channel *fdc = f->fdc;
-    unsigned char *voice = f->packed_codec_bits;
+    unsigned char *voice = f->rx_payload_bits;
     int nin = f->nin;
     int i;
     int offset = 0;
@@ -603,7 +608,12 @@ int freedv_6000_codecrx(struct freedv *f, short *samples)
         max = fmaxf(m->demod_bin[i], max);
     }
     f->stats.snr_est = 10.0 * log10f(max/min);
-    
-    return ret;
+
+    int rx_status = 0;
+    if (m->demod_sync == M6000_SYNC_FRAME)
+        rx_status |= RX_SYNC;
+    if (ret)
+        rx_status |= RX_BITS;
+    return rx_status;
 }
 

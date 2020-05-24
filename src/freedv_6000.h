@@ -24,9 +24,7 @@ void freedv_6000_open(struct freedv *f);
 void freedv_6000_close(struct freedv *f);
 
 int freedv_6000_datatx(struct freedv *f, short *samples);
-int freedv_6000_codectx(struct freedv *f, short *samples);
-int freedv_6000_codecrx(struct freedv *f, short *samples);
-
-int freedv_6000_get_codec_bytes(struct freedv *);
+int freedv_6000_rawdatatx(struct freedv *f, short *samples);
+int freedv_6000_rawdatarx(struct freedv *f, short *samples);
 
 #endif /* _FREEDV_6000_H_ */
