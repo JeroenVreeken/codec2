@@ -196,7 +196,7 @@ int main(int argc, char *argv[]) {
     bool                      multicast = false;
 
     if (argc < 3) {
-        printf("usage: %s 2400A|2400B|800XA OutputModemRawFile\n"
+        printf("usage: %s 2400A|2400B|800XA|6000 OutputModemRawFile\n"
 	       " [--frames nr] [--callsign callsign] [--ssid ssid] [--mac-multicast 0|1]\n", argv[0]);
         printf("e.g    %s 2400A data_fdmdv.raw\n", argv[0]);
         exit(1);
@@ -209,13 +209,15 @@ int main(int argc, char *argv[]) {
         mode = FREEDV_MODE_2400B;
     if (!strcmp(argv[1],"800XA"))
         mode = FREEDV_MODE_800XA;
+    if (!strcmp(argv[1],"6000"))
+        mode = FREEDV_MODE_6000;
     if (mode == -1) {
         fprintf(stderr, "Error in mode: %s\n", argv[1]);
         exit(0);
     }
 
     if (strcmp(argv[2], "-") == 0) fout = stdout;
-    else if ( (fout = fopen(argv[3],"wb")) == NULL ) {
+    else if ( (fout = fopen(argv[2],"wb")) == NULL ) {
         fprintf(stderr, "Error opening output modem sample file: %s: %s.\n", argv[3], strerror(errno));
         exit(1);
     }

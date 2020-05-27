@@ -163,7 +163,7 @@ int main(int argc, char *argv[]) {
 
     
     if (argc < 3) {
-	printf("usage: %s 2400A|2400B|800XA InputModemSpeechFile\n"
+	printf("usage: %s 2400A|2400B|800XA|6000 InputModemSpeechFile\n"
                " \n", argv[0]);
 	printf("e.g    %s 2400A data_fdmdv.raw\n", argv[0]);
 	exit(1);
@@ -178,6 +178,8 @@ int main(int argc, char *argv[]) {
         mode = FREEDV_MODE_2400B;
     if (!strcmp(argv[1],"800XA"))
         mode = FREEDV_MODE_800XA;
+    if (!strcmp(argv[1],"6000"))
+        mode = FREEDV_MODE_6000;
     assert(mode != -1);
 
     if (strcmp(argv[2], "-")  == 0) fin = stdin;
