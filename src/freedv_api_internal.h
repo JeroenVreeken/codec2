@@ -44,6 +44,7 @@
 #endif
 #include "freedv_6000.h"
 #include "freedv_data_channel.h"
+#include "freedv_api.h"
 
 #ifdef __cplusplus
   extern "C" {
