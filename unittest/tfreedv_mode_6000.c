@@ -104,6 +104,11 @@ int main(int argc, char **argv)
     assert(mode == FREEDV_MODE_6000);
     printf("Passed\n");
 
+    printf("freedv_get_speech_sample_rate() ");
+    int speech_sample_rate = freedv_get_speech_sample_rate(f);
+    assert(speech_sample_rate == 8000);
+    printf("%d Passed\n", speech_sample_rate);
+
     printf("freedv_get_modem_sample_rate() ");
     int sample_rate = freedv_get_modem_sample_rate(f);
     assert(sample_rate == 48000);

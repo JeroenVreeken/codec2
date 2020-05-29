@@ -179,6 +179,7 @@ void freedv_6000_open(struct freedv *f)
     f->n_nat_modem_samples = M6000_FRAMESIZE;
     f->modem_sample_rate = M6000_RATE;
     f->modem_symbol_rate = M6000_SYMBOLRATE;
+    f->speech_sample_rate = FREEDV_FS_8000;
     f->n_speech_samples = 6*codec2_samples_per_frame(f->codec2);
     f->n_codec_frames = 6;
     f->bits_per_codec_frame = codec2_bits_per_frame(f->codec2);
