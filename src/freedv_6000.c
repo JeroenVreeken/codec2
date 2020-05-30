@@ -20,6 +20,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <stdbool.h>
 #include "freedv_6000.h"
 #include "freedv_api_internal.h"
 #include "codec2.h"

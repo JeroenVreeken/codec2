@@ -476,6 +476,10 @@ endif()
              COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
                             ./freedv_tx 800XA ../../raw/ve9qrp_10s.raw - | ./freedv_rx 800XA - /dev/null")
              set_tests_properties(test_freedv_api_800XA PROPERTIES PASS_REGULAR_EXPRESSION "frames decoded: 125")
+     add_test(NAME test_freedv_api_6000
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./freedv_tx 6000 ../../raw/ve9qrp_10s.raw - | ./freedv_rx 6000 - /dev/null")
+             set_tests_properties(test_freedv_api_6000 PROPERTIES PASS_REGULAR_EXPRESSION "frames decoded: 82")
 
      add_test(NAME test_freedv_api_rawdata_800XA
              COMMAND sh -c "./tfreedv_800XA_rawdata"
