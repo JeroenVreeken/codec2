@@ -355,6 +355,20 @@ int freedv_6000_rawdatatx(struct freedv *f, short *samples)
     return 0;
 }
 
+
+int freedv_6000_rawdatacomptx(struct freedv *f, COMP mod_out[])
+{
+    short real[f->n_nom_modem_samples];
+    int i;
+    int r = freedv_6000_rawdatatx(f, real);
+    
+    for(i=0; i<f->n_nom_modem_samples; i++){
+         mod_out[i].real = (float)real[i] / (float)M6000_AMP;
+    }
+    
+    return r;
+}
+
 static bool m6000_demod_frame_bit(struct m6000 *m, int *nr)
 {
     int bit_index = (m->demod_sync_nr + *nr) % M6000_FRAMESYMBOLS;

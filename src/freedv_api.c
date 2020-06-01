@@ -402,6 +402,15 @@ void freedv_comptx(struct freedv *f, COMP mod_out[], short speech_in[]) {
     if(FDV_MODE_ACTIVE( FREEDV_MODE_2400A, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_2400B, f->mode)){
         codec2_encode(f->codec2, f->tx_payload_bits, speech_in);
         freedv_comptx_fsk_voice(f, mod_out);
+    } else if (FDV_MODE_ACTIVE( FREEDV_MODE_6000, f->mode)) {
+	int speech_per_codec_frame = codec2_samples_per_frame(f->codec2);
+	int bytes_per_codec_frame = (f->bits_per_codec_frame + 7) / 8;
+        int i;
+	
+	for (i=0; i < f->n_codec_frames; i++) {
+	    codec2_encode(f->codec2, &f->tx_payload_bits[i*bytes_per_codec_frame], &speech_in[i*speech_per_codec_frame]);
+	}
+        freedv_6000_rawdatacomptx(f, mod_out);
     }
 }
 
