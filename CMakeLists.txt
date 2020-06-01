@@ -540,6 +540,19 @@ if (NOT APPLE)
              )
              set_tests_properties(test_memory_leak_FreeDV_700C_rx PROPERTIES PASS_REGULAR_EXPRESSION "ERROR SUMMARY: 0 errors")
 
+     add_test(NAME test_memory_leak_FreeDV_6000_tx
+             COMMAND sh -c " valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./freedv_tx 6000 ${CMAKE_CURRENT_SOURCE_DIR}/raw/hts1a.raw /dev/null"
+             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
+             )
+             set_tests_properties(test_memory_leak_FreeDV_6000_tx PROPERTIES PASS_REGULAR_EXPRESSION "ERROR SUMMARY: 0 errors")
+
+     add_test(NAME test_memory_leak_FreeDV_6000_rx
+             COMMAND sh -c "cd  ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./freedv_tx 6000 ${CMAKE_CURRENT_SOURCE_DIR}/raw/hts1a.raw t.raw; \
+                            valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./freedv_rx 6000 t.raw /dev/null"
+             )
+             set_tests_properties(test_memory_leak_FreeDV_6000_rx PROPERTIES PASS_REGULAR_EXPRESSION "ERROR SUMMARY: 0 errors")
+
 if(LPCNET)
      add_test(NAME test_memory_leak_FreeDV_2020_tx
              COMMAND sh -c "cd  ${CMAKE_CURRENT_BINARY_DIR}/src;

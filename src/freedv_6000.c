@@ -199,7 +199,7 @@ void freedv_6000_close(struct freedv *f)
     free(f->m6000);
 }
 
-static int m6000_mod_symbol(struct m6000 *m, bool bit, short *samples)
+static int m6000_mod_symbol(struct m6000 *m, bool bit, COMP mod_out[])
 {
     int sym;
     int i;
@@ -221,10 +221,10 @@ static int m6000_mod_symbol(struct m6000 *m, bool bit, short *samples)
     }
 
     
-    samples += m->mod_nr * 8;
+    mod_out += m->mod_nr * 8;
 
     for (i = 0; i < M6000_SYMBOLSAMPLES; i++) {
-        samples[i] = val[i];
+        mod_out[i].real = val[i];
     }
 
     m->mod_nr++;
@@ -232,21 +232,21 @@ static int m6000_mod_symbol(struct m6000 *m, bool bit, short *samples)
     return M6000_SYMBOLSAMPLES;
 }
 
-static void m6000_mod_bit(struct m6000 *m, bool bit, short *samples)
+static void m6000_mod_bit(struct m6000 *m, bool bit, COMP mod_out[])
 {
-    m6000_mod_symbol(m, bit, samples);
+    m6000_mod_symbol(m, bit, mod_out);
 }
 
-static void m6000_mod_bit_scrambled(struct m6000 *m, bool bit, unsigned short *scrambler, short *samples)
+static void m6000_mod_bit_scrambled(struct m6000 *m, bool bit, unsigned short *scrambler, COMP mod_out[])
 {
     bool scrambler_bit = ((*scrambler & 0x2) >> 1) ^ (*scrambler & 0x1);
     *scrambler >>= 1;
     *scrambler |= scrambler_bit << 14;
     
-    m6000_mod_bit(m, bit ^ scrambler_bit, samples);
+    m6000_mod_bit(m, bit ^ scrambler_bit, mod_out);
 }
 
-int freedv_6000_datatx(struct freedv *f, short *samples)
+int freedv_6000_data_comptx(struct freedv *f, COMP mod_out[])
 {
     struct freedv_data_channel *fdc = f->fdc;
     struct m6000 *m = f->m6000;
@@ -254,7 +254,7 @@ int freedv_6000_datatx(struct freedv *f, short *samples)
     int i;
     
     for (i = 0; i < sizeof (m6000_sync_data)/sizeof(m6000_sync_data[0]); i++) {
-        m6000_mod_bit(m, m6000_sync_data[i], samples);
+        m6000_mod_bit(m, m6000_sync_data[i], mod_out);
     }
     unsigned short scrambler = M6000_SCRAMBLER_SEED;
 
@@ -271,7 +271,7 @@ int freedv_6000_datatx(struct freedv *f, short *samples)
 
     for (byte = 0, byteb = 0; byte < M6000_FULLDATABYTES;) {
         bool bit = (databytes[byte] >> (7 - byteb)) & 1;
-        m6000_mod_bit_scrambled(m, bit, &scrambler, samples);
+        m6000_mod_bit_scrambled(m, bit, &scrambler, mod_out);
         
         byteb++;
         if (byteb > 7) {
@@ -281,13 +281,13 @@ int freedv_6000_datatx(struct freedv *f, short *samples)
     }
     for (byteb = 0; byteb < M6000_FULLDATAENDBITS; byteb++) {
         bool bit = (end_bits >> (7 - byteb)) & 1;
-        m6000_mod_bit_scrambled(m, bit, &scrambler, samples);
+        m6000_mod_bit_scrambled(m, bit, &scrambler, mod_out);
     }
-    m6000_mod_bit_scrambled(m, from_bit, &scrambler, samples);
-    m6000_mod_bit_scrambled(m, bcast_bit, &scrambler, samples);
+    m6000_mod_bit_scrambled(m, from_bit, &scrambler, mod_out);
+    m6000_mod_bit_scrambled(m, bcast_bit, &scrambler, mod_out);
     
     for (i = 0; i < M6000_FULLDATASPARE; i++) {
-        m6000_mod_bit_scrambled(m, 0, &scrambler, samples);
+        m6000_mod_bit_scrambled(m, 0, &scrambler, mod_out);
     }
 
     assert(m->mod_nr == M6000_FRAMESYMBOLS);
@@ -295,7 +295,7 @@ int freedv_6000_datatx(struct freedv *f, short *samples)
     return 0;
 }
 
-int freedv_6000_rawdatatx(struct freedv *f, short *samples)
+int freedv_6000_rawdata_comptx(struct freedv *f, COMP mod_out[])
 {
     struct m6000 *m = f->m6000;
     struct freedv_data_channel *fdc = f->fdc;
@@ -304,7 +304,7 @@ int freedv_6000_rawdatatx(struct freedv *f, short *samples)
     int i;
     
     for (i = 0; i < sizeof (m6000_sync_voice)/sizeof(m6000_sync_voice[0]); i++) {
-        m6000_mod_bit(m, m6000_sync_voice[i], samples);
+        m6000_mod_bit(m, m6000_sync_voice[i], mod_out);
     }
     unsigned short scrambler = M6000_SCRAMBLER_SEED;
 
@@ -320,7 +320,7 @@ int freedv_6000_rawdatatx(struct freedv *f, short *samples)
 
     for (byte = 0, byteb = 0; byte < M6000_SLOWDATABYTES;) {
         bool bit = (databytes[byte] >> (7 - byteb)) & 1;
-        m6000_mod_bit_scrambled(m, bit, &scrambler, samples);
+        m6000_mod_bit_scrambled(m, bit, &scrambler, mod_out);
             
         byteb++;
         if (byteb > 7) {
@@ -330,18 +330,18 @@ int freedv_6000_rawdatatx(struct freedv *f, short *samples)
     }
     for (byteb = 0; byteb < M6000_SLOWDATAENDBITS; byteb++) {
         bool bit = (end_bits >> (3 - byteb)) & 1;
-        m6000_mod_bit_scrambled(m, bit, &scrambler, samples);
+        m6000_mod_bit_scrambled(m, bit, &scrambler, mod_out);
     }
-    m6000_mod_bit_scrambled(m, from_bit, &scrambler, samples);
-    m6000_mod_bit_scrambled(m, bcast_bit, &scrambler, samples);
-    m6000_mod_bit_scrambled(m, crc_bit, &scrambler, samples);
+    m6000_mod_bit_scrambled(m, from_bit, &scrambler, mod_out);
+    m6000_mod_bit_scrambled(m, bcast_bit, &scrambler, mod_out);
+    m6000_mod_bit_scrambled(m, crc_bit, &scrambler, mod_out);
         
     /* reserved */
-    m6000_mod_bit_scrambled(m, 0, &scrambler, samples);
+    m6000_mod_bit_scrambled(m, 0, &scrambler, mod_out);
 
     for (byte = 0, byteb = 0; byte < M6000_VOICEBYTES;) {
         bool bit = (voice[byte] >> (7 - byteb)) & 1;
-        m6000_mod_bit_scrambled(m, bit, &scrambler, samples);
+        m6000_mod_bit_scrambled(m, bit, &scrambler, mod_out);
         
         byteb++;
         if (byteb > 7) {
@@ -355,19 +355,6 @@ int freedv_6000_rawdatatx(struct freedv *f, short *samples)
     return 0;
 }
 
-
-int freedv_6000_rawdatacomptx(struct freedv *f, COMP mod_out[])
-{
-    short real[f->n_nom_modem_samples];
-    int i;
-    int r = freedv_6000_rawdatatx(f, real);
-    
-    for(i=0; i<f->n_nom_modem_samples; i++){
-         mod_out[i].real = real[i];
-    }
-    
-    return r;
-}
 
 static bool m6000_demod_frame_bit(struct m6000 *m, int *nr)
 {
@@ -486,7 +473,7 @@ static int m6000_demod_frame_voice(struct m6000 *m, struct freedv_data_channel *
     return M6000_VOICEBYTES;
 }
 
-int freedv_comprx_6000(struct freedv *f, COMP demod_in[])
+int freedv_6000_comprx(struct freedv *f, COMP demod_in[])
 {
     struct m6000 *m = f->m6000;
     struct freedv_data_channel *fdc = f->fdc;

@@ -296,14 +296,6 @@ void freedv_tx(struct freedv *f, short mod_out[], short speech_in[]) {
             codec2_encode(f->codec2, f->tx_payload_bits, speech_in);
         }
         freedv_tx_fsk_voice(f, mod_out);
-    } else if (FDV_MODE_ACTIVE( FREEDV_MODE_6000, f->mode)) {
-	int speech_per_codec_frame = codec2_samples_per_frame(f->codec2);
-	int bytes_per_codec_frame = (f->bits_per_codec_frame + 7) / 8;
-
-	for (i=0; i < f->n_codec_frames; i++) {
-	    codec2_encode(f->codec2, &f->tx_payload_bits[i*bytes_per_codec_frame], &speech_in[i*speech_per_codec_frame]);
-	}
-        freedv_6000_rawdatatx(f, mod_out);
     } else {
         freedv_comptx(f, tx_fdm, speech_in);
         for(i=0; i<f->n_nom_modem_samples; i++)
@@ -411,7 +403,7 @@ void freedv_comptx(struct freedv *f, COMP mod_out[], short speech_in[]) {
 	for (i=0; i < f->n_codec_frames; i++) {
 	    codec2_encode(f->codec2, &f->tx_payload_bits[i*bytes_per_codec_frame], &speech_in[i*speech_per_codec_frame]);
 	}
-        freedv_6000_rawdatacomptx(f, mod_out);
+        freedv_6000_rawdata_comptx(f, mod_out);
     }
 }
 
@@ -431,7 +423,12 @@ void freedv_rawdatatx(struct freedv *f, short mod_out[], unsigned char *packed_p
     }
     if(FDV_MODE_ACTIVE( FREEDV_MODE_6000, f->mode)) {
         memcpy(f->tx_payload_bits, packed_payload_bits, (f->bits_per_modem_frame + 7) / 8);
-        freedv_6000_rawdatatx(f, mod_out);
+
+        freedv_6000_rawdata_comptx(f, tx_fdm);
+    
+        for(int i=0; i<f->n_nom_modem_samples; i++){
+            mod_out[i] = tx_fdm[i].real;
+        }
         return;
     }
 
@@ -463,7 +460,24 @@ void freedv_datatx (struct freedv *f, short mod_out[]) {
         freedv_tx_fsk_data(f, mod_out);
     }
     if (FDV_MODE_ACTIVE( FREEDV_MODE_6000, f->mode)) {
-        freedv_6000_datatx(f, mod_out);
+        COMP comp_out[f->n_nom_modem_samples];
+        freedv_6000_data_comptx(f, comp_out);
+	for (int i = 0; i < f->n_nom_modem_samples; i++)
+	    mod_out[i] = comp_out[i].real;
+    }
+}
+
+void freedv_datacomptx(struct freedv *f, COMP mod_out[])
+{
+    assert(f != NULL);
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_2400A, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_2400B, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_800XA, f->mode)) {
+        short out[f->n_nom_modem_samples];
+        freedv_tx_fsk_data(f, out);
+	for (int i = 0; i < f->n_nom_modem_samples; i++)
+	    mod_out[i].real = out[i];
+    }
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_6000, f->mode)) {
+        freedv_6000_data_comptx(f, mod_out);
     }
 }
 
@@ -618,7 +632,7 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
 #endif
     }
     if (FDV_MODE_ACTIVE( FREEDV_MODE_6000, f->mode)) {
-        rx_status = freedv_comprx_6000(f, demod_in);
+        rx_status = freedv_6000_comprx(f, demod_in);
     }
 
     short demod_in_short[f->nin_prev];
@@ -860,7 +874,7 @@ int freedv_rawdatarx(struct freedv *f, unsigned char *packed_payload_bits, short
     }
 
     if (FDV_MODE_ACTIVE( FREEDV_MODE_6000, f->mode)) {
-        rx_status = freedv_comprx_6000(f, rx_fdm);
+        rx_status = freedv_6000_comprx(f, rx_fdm);
 	f->rx_status = rx_status;
 	if (rx_status & RX_BITS) {
             ret = (f->bits_per_modem_frame + 7 ) / 8;
