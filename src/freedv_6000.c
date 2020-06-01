@@ -363,7 +363,7 @@ int freedv_6000_rawdatacomptx(struct freedv *f, COMP mod_out[])
     int r = freedv_6000_rawdatatx(f, real);
     
     for(i=0; i<f->n_nom_modem_samples; i++){
-         mod_out[i].real = (float)real[i] / (float)M6000_AMP;
+         mod_out[i].real = real[i];
     }
     
     return r;
