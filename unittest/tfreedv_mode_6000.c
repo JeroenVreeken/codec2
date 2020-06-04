@@ -17,10 +17,14 @@
 */
 
 #include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
 #include "freedv_api.h"
 #include "assert.h"
 
 unsigned char header[6] = { 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0x42 };
+
+int bigdata = 0;
 
 int datarx_called = 0;
 int datarx_from_ok = 0;
@@ -28,8 +32,11 @@ void tfreedv_mode6000_callback_datarx(void *arg, unsigned char *packet, size_t s
 {
     datarx_called++;
 
-    if (size >= 12 && !memcmp(packet + 6, header, 6)) {
-        datarx_from_ok++;
+    if (!bigdata)
+    {
+        if (size >= 12 && !memcmp(packet + 6, header, 6)) {
+            datarx_from_ok++;
+        }
     }
 }
 
@@ -37,7 +44,12 @@ int datatx_called = 0;
 void tfreedv_mode6000_callback_datatx(void *arg, unsigned char *packet, size_t *size)
 {
     datatx_called++;
-    *size = 0;
+    if (!bigdata) {
+        *size = 0;
+    } else {
+        memset(packet, 0xa5, 1024);
+	*size = 1024;
+    }
 }
 
 
@@ -313,6 +325,33 @@ int main(int argc, char **argv)
     assert(datarx_called == 1);
     assert(datarx_from_ok == 1);
     printf("Passed\n"); /* store: . ......... ........... . .dD */
+
+    printf("multiple freedv_datatx() bigdata ");
+    bigdata = 1;
+    datatx_called = 0;
+    for (i = 0; i < 20; i++) {
+        freedv_datatx(f, mod_out);
+        tfreedv_mode6000_mod_store(mod_out, 5760);
+    }
+    assert(datatx_called == 2);
+    printf("Passed\n");
+
+    printf("multiple freedv_rawdatarx() [data] ");
+    datarx_called = 0;
+    datarx_from_ok = 0;
+    for (i = 0; i < 20; i++) {
+        nin = freedv_nin(f);
+        demod_in = tfreedv_mode6000_mod_get(nin);
+        r = freedv_rawdatarx(f, packed_codec_bits, demod_in);
+	assert(r == 0);
+        sync = freedv_get_sync(f);
+        if (!sync) {
+            printf("sync value %d was unexpected\n", sync);
+        }
+    }
+    assert(datarx_called == 3);
+    assert(datarx_from_ok == 0);
+    printf("Passed\n"); 
 
     printf("freedv_close() ");
     freedv_close(f);
