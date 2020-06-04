@@ -492,7 +492,7 @@ int  freedv_data_ntxframes (struct freedv *f) {
         if (f->deframer->fdc)
             return freedv_data_get_n_tx_frames(f->deframer->fdc, 6);
     } else if (FDV_MODE_ACTIVE( FREEDV_MODE_6000, f->mode)) {
-        freedv_data_get_n_tx_frames(f->fdc, 8);
+        return freedv_data_get_n_tx_frames(f->fdc, 8);
     }
     return 0;
 }
