@@ -10,6 +10,7 @@ Also included:
   + High performance Non-coherent FSK modem [README_fsk](README_fsk.md)
   + Coherent PSK [README_cohpsk](README_cohpsk.md) for HF channels
   + FDMDV DPSK modem [README_fdmdv](README_fdmdv.txt) for HF channels
+  + 6000 baud mode [README_mode6000](README_mode6000.md) for VHF/UHF
 
 ## Quickstart
 
