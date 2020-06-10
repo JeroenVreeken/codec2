@@ -21,17 +21,12 @@
 #include <stdbool.h>
 
 #include "freedv_6000.h"
-#include "freedv_data_channel.h"
 
 bool rx_check = true;
 bool rx_check_failed = false;
 bool const_check_failed = false;
 
 int demod_sync_nr = 0;
-int data_channel_rx_6 = 0;
-int data_channel_rx_86 = 0;
-int data_channel_rx_ok_6 = 0;
-int data_channel_rx_ok_86 = 0;
 int voice_test_nr = 0;
 
 int ber_checked = 0;
@@ -43,87 +38,6 @@ int ber_errors = 0;
 #define M6000_FRAMESIZE		((M6000_RATE * 120)/1000)
 #define M6000_FRAMESIZEMAX	(M6000_FRAMESIZE + 8)
 
-void freedv_data_channel_rx_frame(struct freedv_data_channel *fdc, unsigned char *data, size_t size, int from_bit, int bcast_bit, int crc_bit, int end_bits)
-{
-	printf("freedv_data_channel_rx_frame(%p, %p, %zd)\n", fdc, data, size);
-	
-	int i;
-	unsigned char testval = 0;
-	int ok = 1;
-	
-	for (i = 0; i < size; i++) {
-		unsigned char value = data[i];
-		printf("%02x", value);
-		
-		if (rx_check) {
-			unsigned char expected = testval;
-			int bit;
-		
-			for (bit = 0; bit < 8; bit++) {
-				ber_checked++;
-				unsigned char mask = 1 << bit;
-				if ((expected & mask) != (value & mask)) {
-					ber_errors++;
-				}
-			}
-
-			if (value != testval) {
-				printf(" data byte %d: 0x%02x does not match calculated 0x%02x\n", i, value, testval);
-				rx_check_failed = true;
-				ok = 0;
-			}
-		}
-		
-		testval += size;
-	}
-	
-	if (rx_check) {
-		if (end_bits != size) {
-			printf("end_bits %d invalid\n", end_bits);
-			rx_check_failed = true;
-		}
-		if (from_bit != 0) {
-			printf("from_bit %d invalid\n", from_bit);
-			rx_check_failed = true;
-		}
-		if (bcast_bit != 1) {
-			printf("bcast_bit %d invalid\n", bcast_bit);
-			rx_check_failed = true;
-		}
-		if (crc_bit != (size == 6)) {
-			printf("crc_bit %d invalid\n", crc_bit);
-			rx_check_failed = true;
-		}
-	}
-	
-	if (size == 6) {
-		data_channel_rx_6++;
-		data_channel_rx_ok_6 += ok;
-	}
-	if (size == 86) {
-		data_channel_rx_86++;
-		data_channel_rx_ok_86 += ok;
-	}
-	
-	printf(" %d %d %d\n", from_bit, bcast_bit, end_bits);
-}
-
-void freedv_data_channel_tx_frame(struct freedv_data_channel *fdc, unsigned char *data, size_t size, int *from_bit, int *bcast_bit, int *crc_bit, int *end_bits)
-{
-	printf("freedv_data_channel_tx_frame(%p, %p, %zd\n", fdc, data, size);
-	
-	unsigned char testval = 0;
-	int i;
-	
-	for (i = 0; i < size; i++) {
-		data[i] = testval;
-		testval += size;
-	}
-	*end_bits = size;
-	*from_bit = 0;
-	*bcast_bit = 1;
-	*crc_bit = (size == 6);
-}
 
 void m6000_test_voice_gen(unsigned char *voice)
 {
@@ -271,18 +185,6 @@ int main(int argc, char **argv)
 	}
 	if (test_demod) {
 		printf("Demod was synced for %d frames\n", demod_sync_nr);
-		printf("Demod received %d (out of %d) frames with 6 data bytes\n", 
-		    data_channel_rx_ok_6, data_channel_rx_6);
-		if (data_channel_rx_ok_6 < (NR_FRAMES/2)-1) {
-			printf("RX failed due to to little 6 byte frames\n");
-			rx_check_failed = true;
-		}
-		printf("Demod received %d (out of %d) frames with 86 data bytes\n", 
-		    data_channel_rx_ok_86, data_channel_rx_86);
-		if (data_channel_rx_ok_86 < (NR_FRAMES/2)-1) {
-			printf("RX failed due to to little 86 byte frames\n");
-			rx_check_failed = true;
-		}
 		printf("Demod received %d correct voice frames\n", voice_test_nr);
 		printf("BER %f (%d errors in %d bits)\n", (float)ber_errors/(float)ber_checked, ber_errors, ber_checked);
 	}
