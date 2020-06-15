@@ -31,6 +31,11 @@ int datarx_from_ok = 0;
 void tfreedv_mode6000_callback_datarx(void *arg, unsigned char *packet, size_t size)
 {
     datarx_called++;
+    int i;
+    //for (i = 0; i < size; i++) {
+    //    printf("0x%02x ", packet[i]);
+    //}
+    //printf(": %zd\n", size);
 
     if (!bigdata)
     {
@@ -48,7 +53,7 @@ void tfreedv_mode6000_callback_datatx(void *arg, unsigned char *packet, size_t *
         *size = 0;
     } else {
         memset(packet, 0xa5, 1024);
-	*size = 1024;
+	*size = 512;
     }
 }
 

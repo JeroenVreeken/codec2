@@ -22,18 +22,18 @@ All bits, except the sync bits, will be scrambled to reduce long runs of ones or
 Field           | second  | frame
 ----------------|---------|------
 baud            | 6000    | 720
-sync bits       |  133.33 |  16
+sync bits       |  200    |  24
+fec bits        | 5800    | 696
+payload bits    | 3866.67 | 464
 ----------------|---------|------
-voice bits      | 5400    | 648
-used voice bits | 3200    | 384
+voice bits      | 3200    | 384
 codec2 frames   |   50    |   6
-extra data bits |  400    |  48
-control bits    |   58.33 |   7
-reserved bits   |    8.33 |   1
+extra data bits |  600    |  72
+control bits    |   50    |   6
+reserved bits   |   16.67 |   2
 ----------------|---------|------
-data frame bits | 5733.33 | 688
-control bits    |   83.33 |  10
-reserved bits   |   50    |   6
+data frame bits | 3800    | 456
+control bits    |   66.67 |   8
 
 
 ## Voice frame

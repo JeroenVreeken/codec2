@@ -24,6 +24,7 @@
 #include "HRA_112_112.h"  
 #include "HRAb_396_504.h"
 #include "H_256_768_22.h"
+#include "H_696_232.h"
 
 int opt_exists(char *argv[], int argc, char opt[]) {
     int i;
@@ -98,6 +99,15 @@ int main(int argc, char *argv[])
             ldpc.max_col_weight = H_256_768_22_MAX_COL_WEIGHT;
             ldpc.H_rows = (uint16_t *)H_256_768_22_H_rows;
             ldpc.H_cols = (uint16_t *)H_256_768_22_H_cols;
+        } else if (strcmp(argv[codename+1], "H_696_232") == 0) {
+            fprintf(stderr, "code: %s\n", argv[codename+1]);
+            ldpc.CodeLength = H_696_232_CODELENGTH;
+            ldpc.NumberParityBits = H_696_232_NUMBERPARITYBITS;
+            ldpc.NumberRowsHcols = H_696_232_NUMBERROWSHCOLS;
+            ldpc.max_row_weight = H_696_232_MAX_ROW_WEIGHT;
+            ldpc.max_col_weight = H_696_232_MAX_COL_WEIGHT;
+            ldpc.H_rows = (uint16_t *)H_696_232_H_rows;
+            ldpc.H_cols = (uint16_t *)H_696_232_H_cols;
         }
         else {
             fprintf(stderr, "Unknown code: %s, defaulting to H2064_516_sparse\n", argv[codename+1]);

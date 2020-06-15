@@ -72,8 +72,11 @@ function ldpc_gen_c_h_file(varargin)
    
     [code_param framesize rate] = ldpc_init_user(HRA, modulation, mod_order, mapping);
   
-    code_length = code_param.symbols_per_frame;
+    code_length = code_param.coded_syms_per_frame;
     code_length % reported as 112.
+
+    data_length = code_param.data_bits_per_frame;
+    data_length % data
   
     % *********************  test for enc/dec
    [input_decoder_c, detected_data] = genInputOutputData(code_param, max_iterations, decoder_type);
@@ -85,7 +88,7 @@ function ldpc_gen_c_h_file(varargin)
  
     fprintf(f,"#define %s_NUMBERPARITYBITS %d\n", ldpcArrayName, rows(code_param.H_rows));
     fprintf(f,"#define %s_MAX_ROW_WEIGHT %d\n", ldpcArrayName, columns(code_param.H_rows));
-    fprintf(f,"#define %s_CODELENGTH %d\n", ldpcArrayName, code_param.symbols_per_frame);
+    fprintf(f,"#define %s_CODELENGTH %d\n", ldpcArrayName, code_param.coded_syms_per_frame);
     fprintf(f,"#define %s_NUMBERROWSHCOLS %d\n", ldpcArrayName, rows(code_param.H_cols));
     fprintf(f,"#define %s_MAX_COL_WEIGHT %d\n", ldpcArrayName, columns(code_param.H_cols));
     fprintf(f,"#define %s_DEC_TYPE %d\n", ldpcArrayName, decoder_type);
@@ -174,7 +177,7 @@ function [input_decoder_c, detected_data] = genInputOutputData(code_param, max_i
  
     EsNo = 10^(EsNodB/10);
     variance = 1/(2*EsNo);
-    noise = sqrt(variance)* randn(1,code_param.symbols_per_frame);
+    noise = sqrt(variance)* randn(1,code_param.coded_syms_per_frame);
     r = s + noise;
    
     % borrowed from ldpc_fsk_lib.m, ldpc_decode
