@@ -198,6 +198,7 @@ set(CODEC2_SRCS
     HRA_112_112.c
     HRAb_396_504.c
     H_256_768_22.c
+    HRA_696_232.c
     lpcnet_freq.c
 )
 
@@ -224,9 +225,9 @@ set(CODEC2_PUBLIC_HEADERS
 # Setup the codec2 library
 #
 add_library(codec2 ${CODEC2_SRCS})
-if(UNIX)
+#if(UNIX)
     target_link_libraries(codec2 m)
-endif(UNIX)
+#endif(UNIX)
 if(LPCNET AND lpcnetfreedv_FOUND)
     target_link_libraries(codec2 lpcnetfreedv)
 endif()

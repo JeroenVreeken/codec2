@@ -270,17 +270,35 @@ static void m6000_mod_bit_scrambled(struct m6000 *m, bool bit, unsigned short *s
     m6000_mod_bit(m, bit ^ scrambler_bit, mod_out);
 }
 
-int freedv_6000_data_comptx(struct freedv *f, COMP mod_out[])
+static int freedv_6000_mod(struct freedv *f, bool sync[M6000_SYNCSIZE], unsigned char *payload, COMP mod_out[])
 {
-    struct freedv_data_channel *fdc = f->fdc;
     struct m6000 *m = f->m6000;
     m->mod_nr = 0;
     int i;
-    
-    for (i = 0; i < sizeof (m6000_sync_data)/sizeof(m6000_sync_data[0]); i++) {
-        m6000_mod_bit(m, m6000_sync_data[i], mod_out);
+
+    for (i = 0; i < M6000_SYNCSIZE; i++) {
+        m6000_mod_bit(m, sync[i], mod_out);
     }
     unsigned short scrambler = M6000_SCRAMBLER_SEED;
+
+    unsigned char pbits[M6000_PARITYBITS];
+
+    encode(f->ldpc, payload, pbits);
+    
+    for (i = 0; i < M6000_PAYLOADBITS; i++)
+        m6000_mod_bit_scrambled(m, payload[i], &scrambler, mod_out);
+
+    for (i = 0; i < M6000_PARITYBITS; i++)
+        m6000_mod_bit_scrambled(m, pbits[i], &scrambler, mod_out);
+
+    assert(m->mod_nr == M6000_FRAMESYMBOLS);
+
+    return 0;
+}
+
+int freedv_6000_data_comptx(struct freedv *f, COMP mod_out[])
+{
+    struct freedv_data_channel *fdc = f->fdc;
 
     unsigned char databytes[M6000_FULLDATABYTES] = { 0 };
     int end_bits;
@@ -311,34 +329,14 @@ int freedv_6000_data_comptx(struct freedv *f, COMP mod_out[])
     
     assert(pl_nr == M6000_PAYLOADBITS);
 
-    unsigned char pbits[M6000_PARITYBITS];
-
-    encode(f->ldpc, payload, pbits);
-    
-    for (i = 0; i < M6000_PAYLOADBITS; i++)
-        m6000_mod_bit_scrambled(m, payload[i], &scrambler, mod_out);
-
-    for (i = 0; i < M6000_PARITYBITS; i++)
-        m6000_mod_bit_scrambled(m, pbits[i], &scrambler, mod_out);
-
-    assert(m->mod_nr == M6000_FRAMESYMBOLS);
-
-    return 0;
+    return freedv_6000_mod(f, m6000_sync_data, payload, mod_out);
 }
 
 int freedv_6000_rawdata_comptx(struct freedv *f, COMP mod_out[])
 {
-    struct m6000 *m = f->m6000;
     struct freedv_data_channel *fdc = f->fdc;
     unsigned char *voice = f->tx_payload_bits;
-    m->mod_nr = 0;
-    int i;
     
-    for (i = 0; i < sizeof (m6000_sync_voice)/sizeof(m6000_sync_voice[0]); i++) {
-        m6000_mod_bit(m, m6000_sync_voice[i], mod_out);
-    }
-    unsigned short scrambler = M6000_SCRAMBLER_SEED;
-
     unsigned char databytes[M6000_SLOWDATABYTES] = { 0 };
     int end_bits;
     int from_bit;
@@ -382,19 +380,7 @@ int freedv_6000_rawdata_comptx(struct freedv *f, COMP mod_out[])
 
     assert(pl_nr == M6000_PAYLOADBITS);
 
-    unsigned char pbits[M6000_PARITYBITS];
-
-    encode(f->ldpc, payload, pbits);
-    
-    for (i = 0; i < M6000_PAYLOADBITS; i++)
-        m6000_mod_bit_scrambled(m, payload[i], &scrambler, mod_out);
-
-    for (i = 0; i < M6000_PARITYBITS; i++)
-        m6000_mod_bit_scrambled(m, pbits[i], &scrambler, mod_out);
-
-    assert(m->mod_nr == M6000_FRAMESYMBOLS);
-
-    return 0;
+    return freedv_6000_mod(f, m6000_sync_voice, payload, mod_out);
 }
 
 
@@ -418,29 +404,31 @@ static float m6000_demod_frame_bit_scrambled(struct m6000 *m, int *nr, unsigned 
         return m6000_demod_frame_bit(m, nr);
 }
 
-static int m6000_demod_frame_data(struct freedv *f)
+static int m6000_demod_frame(struct freedv *f, uint8_t out_char[H_696_232_CODELENGTH])
 {
-    struct freedv_data_channel *fdc = f->fdc;
     struct m6000 *m = f->m6000;
-    unsigned char databytes[M6000_FULLDATABYTES] = { 0 };
-    int nr = 0;
-    int i;
-    
-    for (i = 0; i < sizeof (m6000_sync_voice)/sizeof(bool); i++) {
-        m6000_demod_frame_bit(m, &nr);
-    }
+    int nr = M6000_SYNCSIZE;
     unsigned short scrambler = M6000_SCRAMBLER_SEED;
+    int i;
 
     float input[H_696_232_CODELENGTH];
 
     for (i = 0; i < M6000_CODEBITS; i++) {
         input[i] = m6000_demod_frame_bit_scrambled(m, &nr, &scrambler);
-    
     }
 
-    uint8_t out_char[H_696_232_CODELENGTH];
     int pcheckcnt = 0;
-    int r = run_ldpc_decoder(f->ldpc, out_char, input, &pcheckcnt);
+    return run_ldpc_decoder(f->ldpc, out_char, input, &pcheckcnt);
+}
+
+static int m6000_demod_frame_data(struct freedv *f)
+{
+    struct freedv_data_channel *fdc = f->fdc;
+    unsigned char databytes[M6000_FULLDATABYTES] = { 0 };
+    
+    uint8_t out_char[H_696_232_CODELENGTH];
+
+    m6000_demod_frame(f, out_char);
 
     int out_nr = 0;
 
@@ -476,28 +464,12 @@ static int m6000_demod_frame_data(struct freedv *f)
 static int m6000_demod_frame_voice(struct freedv *f)
 {
     struct freedv_data_channel *fdc = f->fdc;
-    struct m6000 *m = f->m6000;
     unsigned char *voice = f->rx_payload_bits;
     unsigned char databytes[M6000_SLOWDATABYTES] = { 0 };
-    int nr = 0;
-    int i;
     
-    for (i = 0; i < sizeof (m6000_sync_voice)/sizeof(bool); i++) {
-        m6000_demod_frame_bit(m, &nr);
-    }
-    unsigned short scrambler = M6000_SCRAMBLER_SEED;
-    
-    float input[H_696_232_CODELENGTH];
-
-    for (i = 0; i < M6000_CODEBITS; i++) {
-        input[i] = m6000_demod_frame_bit_scrambled(m, &nr, &scrambler);
-    
-    }
-
     uint8_t out_char[H_696_232_CODELENGTH];
-    int pcheckcnt = 0;
-    int r = run_ldpc_decoder(f->ldpc, out_char, input, &pcheckcnt);
 
+    m6000_demod_frame(f, out_char);
     int out_nr = 0;
 
     int byte;
@@ -608,7 +580,6 @@ int freedv_6000_comprx(struct freedv *f, COMP demod_in[])
 
                 symval += sym_sample * m6000_sym_demod_shape[sym_i];
             }
-
             bool symbit = signbit(symval) == signbit(m->demod_symval);
 
             m->demod_symval = symval;
@@ -617,7 +588,7 @@ int freedv_6000_comprx(struct freedv *f, COMP demod_in[])
             sym_nr++;
             sym_nr = sym_nr % M6000_FRAMESYMBOLS;
             m->demod_symbol_nr = sym_nr;
-            m->demod_symbols[sym_nr] = 10 - 20 * symbit;
+            m->demod_symbols[sym_nr] = copysignf(symval, symbit ? -1.0 : 1.0);
             
             if ((m->rx_status & RX_SYNC) == 0 ||
                 ((m->rx_status & RX_SYNC) && m->demod_sync_nr == sym_nr)) {
