@@ -198,7 +198,7 @@ set(CODEC2_SRCS
     HRA_112_112.c
     HRAb_396_504.c
     H_256_768_22.c
-    HRA_696_232.c
+    H_696_232.c
     lpcnet_freq.c
 )
 
