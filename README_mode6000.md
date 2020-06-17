@@ -25,6 +25,7 @@ baud            | 6000    | 720
 sync bits       |  200    |  24
 fec bits        | 5800    | 696
 payload bits    | 3866.67 | 464
+parity bits     | 1933.33 | 232
 ----------------|---------|------
 voice bits      | 3200    | 384
 codec2 frames   |   50    |   6
