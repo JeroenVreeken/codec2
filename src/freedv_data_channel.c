@@ -201,7 +201,7 @@ void freedv_data_channel_rx_frame(struct freedv_data_channel *fdc, unsigned char
         rx_crc |= fdc->packet_rx[fdc->packet_rx_cnt - 2];
 
         if (rx_crc == calc_crc) {
-            if (fdc->packet_rx_cnt == size) {
+            if (fdc->packet_rx_cnt <= 8) {
 	        /* It is a single header field, remember it for later */
                 memcpy(fdc->rx_header, fdc->packet_rx, 6);
             }
