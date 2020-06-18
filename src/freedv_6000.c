@@ -588,6 +588,8 @@ int freedv_6000_comprx(struct freedv *f, COMP demod_in[])
             sym_nr++;
             sym_nr = sym_nr % M6000_FRAMESYMBOLS;
             m->demod_symbol_nr = sym_nr;
+	    symval = fmaxf(symval, -10);
+	    symval = fminf(symval, 10);
             m->demod_symbols[sym_nr] = copysignf(symval, symbit ? -1.0 : 1.0);
             
             if ((m->rx_status & RX_SYNC) == 0 ||
