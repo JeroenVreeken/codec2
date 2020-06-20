@@ -46,6 +46,7 @@
 #define M6000_VOICEBYTES	48
 
 #define M6000_CODEBITS    	696
+#define M6000_PAYLOADBITS	(464)
 #define M6000_PARITYBITS   	232
 #define M6000_SYNCSIZE		24
 #define M6000_SYNCSIZE_MIN	20
@@ -64,8 +65,6 @@
  */
 #define M6000_FULLDATABYTES	57
 #define M6000_FULLDATAENDBITS	6
-
-#define M6000_PAYLOADBITS	(464)
 
 /* Sync words for voice and data frames
    Choosen such that they 'break' false syncs.
@@ -256,47 +255,53 @@ static int m6000_mod_symbol(struct m6000 *m, bool bit, COMP mod_out[])
     return M6000_SYMBOLSAMPLES;
 }
 
-static void m6000_mod_bit(struct m6000 *m, bool bit, COMP mod_out[])
+/* We have a frame with symbols (=bits), modulate them */
+static int freedv_6000_mod(struct freedv *f, unsigned char frame[M6000_FRAMESYMBOLS], COMP mod_out[])
 {
-    m6000_mod_symbol(m, bit, mod_out);
-}
-
-static void m6000_mod_bit_scrambled(struct m6000 *m, bool bit, unsigned short *scrambler, COMP mod_out[])
-{
-    bool scrambler_bit = ((*scrambler & 0x2) >> 1) ^ (*scrambler & 0x1);
-    *scrambler >>= 1;
-    *scrambler |= scrambler_bit << 14;
-    
-    m6000_mod_bit(m, bit ^ scrambler_bit, mod_out);
-}
-
-static int freedv_6000_mod(struct freedv *f, bool sync[M6000_SYNCSIZE], unsigned char *payload, COMP mod_out[])
-{
+    int i;
     struct m6000 *m = f->m6000;
     m->mod_nr = 0;
+
+    for (i = 0; i < M6000_FRAMESYMBOLS; i++) {
+        m6000_mod_symbol(m, frame[i], mod_out);
+    }
+    
+    return 0;
+}
+
+/* Payload has been generated, sync word is known, apply FEC and generate a frame of symbols*/
+static int freedv_6000_frametx(struct freedv *f, bool sync[M6000_SYNCSIZE], unsigned char payload[M6000_PAYLOADBITS], unsigned char frame[M6000_FRAMESYMBOLS])
+{
     int i;
+    int nr = 0;
 
     for (i = 0; i < M6000_SYNCSIZE; i++) {
-        m6000_mod_bit(m, sync[i], mod_out);
+    	frame[nr++] = sync[i];
     }
     unsigned short scrambler = M6000_SCRAMBLER_SEED;
 
     unsigned char pbits[M6000_PARITYBITS];
 
     encode(f->ldpc, payload, pbits);
+
+    for (i = 0; i < M6000_CODEBITS; i++) {
+        bool scrambler_bit = ((scrambler & 0x2) >> 1) ^ (scrambler & 0x1);
+        scrambler >>= 1;
+        scrambler |= scrambler_bit << 14;
     
-    for (i = 0; i < M6000_PAYLOADBITS; i++)
-        m6000_mod_bit_scrambled(m, payload[i], &scrambler, mod_out);
+        if (i < M6000_PAYLOADBITS)
+	    frame[nr++] = payload[i] ^ scrambler_bit;
+	else
+	    frame[nr++] = pbits[i - M6000_PAYLOADBITS] ^ scrambler_bit;
+    }
 
-    for (i = 0; i < M6000_PARITYBITS; i++)
-        m6000_mod_bit_scrambled(m, pbits[i], &scrambler, mod_out);
-
-    assert(m->mod_nr == M6000_FRAMESYMBOLS);
+    assert(nr == M6000_FRAMESYMBOLS);
 
     return 0;
 }
 
-int freedv_6000_data_comptx(struct freedv *f, COMP mod_out[])
+/* Generate symbols for a data frame */
+int freedv_6000_data_symtx(struct freedv *f, unsigned char frame[M6000_FRAMESYMBOLS])
 {
     struct freedv_data_channel *fdc = f->fdc;
 
@@ -329,10 +334,11 @@ int freedv_6000_data_comptx(struct freedv *f, COMP mod_out[])
     
     assert(pl_nr == M6000_PAYLOADBITS);
 
-    return freedv_6000_mod(f, m6000_sync_data, payload, mod_out);
+    return freedv_6000_frametx(f, m6000_sync_data, payload, frame);
 }
 
-int freedv_6000_rawdata_comptx(struct freedv *f, COMP mod_out[])
+/* Generate symbols for a voice frame */
+int freedv_6000_rawdata_symtx(struct freedv *f, unsigned char frame[M6000_FRAMESYMBOLS])
 {
     struct freedv_data_channel *fdc = f->fdc;
     unsigned char *voice = f->tx_payload_bits;
@@ -380,7 +386,25 @@ int freedv_6000_rawdata_comptx(struct freedv *f, COMP mod_out[])
 
     assert(pl_nr == M6000_PAYLOADBITS);
 
-    return freedv_6000_mod(f, m6000_sync_voice, payload, mod_out);
+    return freedv_6000_frametx(f, m6000_sync_voice, payload, frame);
+}
+
+int freedv_6000_rawdata_comptx(struct freedv *f, COMP mod_out[])
+{
+    unsigned char frame[M6000_FRAMESYMBOLS];
+
+    freedv_6000_rawdata_symtx(f, frame);
+
+    return freedv_6000_mod(f, frame, mod_out);
+}
+
+int freedv_6000_data_comptx(struct freedv *f, COMP mod_out[])
+{
+    unsigned char frame[M6000_FRAMESYMBOLS];
+
+    freedv_6000_data_symtx(f, frame);
+
+    return freedv_6000_mod(f, frame, mod_out);
 }
 
 
@@ -519,6 +543,55 @@ static int m6000_demod_frame_voice(struct freedv *f)
     return M6000_VOICEBYTES;
 }
 
+/* Symbols have been received, now get the frame(s) out of them */
+static int freedv_6000_symrx(struct freedv *f)
+{
+    struct m6000 *m = f->m6000;
+    int ret = 0;
+    int sym_nr = m->demod_symbol_nr;
+    int bit_pos;
+    int bit_sync_voice = 0;
+    int bit_sync_data = 0;
+    
+    for (bit_pos = 0; bit_pos < M6000_SYNCSIZE; bit_pos++) {
+        int bit_index = (sym_nr + bit_pos) % M6000_FRAMESYMBOLS;
+        bool bitval = signbit(m->demod_symbols[bit_index]);
+        
+        if (m6000_sync_voice[bit_pos] == bitval)
+            bit_sync_voice++;
+        if (m6000_sync_data[bit_pos] == bitval)
+            bit_sync_data++;
+    }
+    
+    int bit_sync_min;
+    if ((m->rx_status & RX_SYNC) == 0)
+        bit_sync_min = M6000_SYNCSIZE;
+    else
+        bit_sync_min = M6000_SYNCSIZE_MIN;
+
+    bool is_sync_voice = false;
+    bool is_sync_data = false;
+
+    if (bit_sync_voice >= bit_sync_min && bit_sync_voice > bit_sync_data)
+        is_sync_voice = true;
+    if (bit_sync_data >= bit_sync_min && bit_sync_data > bit_sync_voice)
+        is_sync_data = true;
+
+    if (is_sync_voice || is_sync_data) {
+        m->rx_status = RX_SYNC;
+        m->demod_sync_nr = sym_nr;
+    } else {
+        m->rx_status = 0;
+    }
+    if (is_sync_data)
+        m6000_demod_frame_data(f);
+    if (is_sync_voice) {
+        ret = m6000_demod_frame_voice(f);
+    }
+
+    return ret;
+}
+
 int freedv_6000_comprx(struct freedv *f, COMP demod_in[])
 {
     struct m6000 *m = f->m6000;
@@ -594,45 +667,7 @@ int freedv_6000_comprx(struct freedv *f, COMP demod_in[])
             
             if ((m->rx_status & RX_SYNC) == 0 ||
                 ((m->rx_status & RX_SYNC) && m->demod_sync_nr == sym_nr)) {
-                int bit_pos;
-                int bit_sync_voice = 0;
-                int bit_sync_data = 0;
-                
-                for (bit_pos = 0; bit_pos < M6000_SYNCSIZE; bit_pos++) {
-                    int bit_index = (sym_nr + bit_pos) % M6000_FRAMESYMBOLS;
-                    bool bitval = signbit(m->demod_symbols[bit_index]);
-                    
-                    if (m6000_sync_voice[bit_pos] == bitval)
-                        bit_sync_voice++;
-                    if (m6000_sync_data[bit_pos] == bitval)
-                        bit_sync_data++;
-                }
-                    
-                int bit_sync_min;
-                if ((m->rx_status & RX_SYNC) == 0)
-                    bit_sync_min = M6000_SYNCSIZE;
-                else
-                    bit_sync_min = M6000_SYNCSIZE_MIN;
-
-                bool is_sync_voice = false;
-                bool is_sync_data = false;
-
-                if (bit_sync_voice >= bit_sync_min && bit_sync_voice > bit_sync_data)
-                        is_sync_voice = true;
-                if (bit_sync_data >= bit_sync_min && bit_sync_data > bit_sync_voice)
-                        is_sync_data = true;
-
-                if (is_sync_voice || is_sync_data) {
-                    m->rx_status = RX_SYNC;
-                    m->demod_sync_nr = sym_nr;
-                } else {
-                    m->rx_status = 0;
-                }
-                if (is_sync_data)
-                    m6000_demod_frame_data(f);
-                if (is_sync_voice) {
-                    ret = m6000_demod_frame_voice(f);
-                }
+                ret = freedv_6000_symrx(f);
             }
         };
     }
