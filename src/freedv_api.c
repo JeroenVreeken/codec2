@@ -575,7 +575,6 @@ int freedv_rx(struct freedv *f, short speech_out[], short demod_in[]) {
         return freedv_shortrx(f, speech_out, demod_in, gain);
     }
     
-
     assert(1); /* should never get here */
     return 0;
 }
@@ -827,7 +826,6 @@ int freedv_rawdatarx(struct freedv *f, unsigned char *packed_payload_bits, short
     int rx_status = 0;
     
     assert(nin <= f->n_max_modem_samples);
-
     f->nin_prev = nin;
     
     COMP rx_fdm[f->n_max_modem_samples];

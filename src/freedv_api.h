@@ -48,7 +48,7 @@
 #define FREEDV_MODE_700C        6
 #define FREEDV_MODE_700D        7
 #define FREEDV_MODE_2020        8
-#define FREEDV_MODE_6000	9
+#define FREEDV_MODE_6000        9
 
 // Sample rates used
 #define FREEDV_FS_8000          8000
