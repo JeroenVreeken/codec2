@@ -237,6 +237,7 @@ int main(int argc, char *argv[]) {
 
     fclose(fin);
     fprintf(stderr, "frames decoded: %d\n", frame);
+    fprintf(stderr, "packets decoded: %d\n", my_cb_state.calls);
 
     freedv_close(freedv);
     return 0;

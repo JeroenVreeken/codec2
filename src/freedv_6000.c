@@ -222,7 +222,7 @@ void freedv_6000_close(struct freedv *f)
     FREE(f->m6000);
 }
 
-static int m6000_mod_symbol(struct m6000 *m, bool bit, COMP mod_out[])
+static int m6000_mod_symbol(struct m6000 *m, bool bit, short mod_out[])
 {
     int sym;
     int i;
@@ -247,7 +247,7 @@ static int m6000_mod_symbol(struct m6000 *m, bool bit, COMP mod_out[])
     mod_out += m->mod_nr * 8;
 
     for (i = 0; i < M6000_SYMBOLSAMPLES; i++) {
-        mod_out[i].real = val[i];
+        mod_out[i] = val[i];
     }
 
     m->mod_nr++;
@@ -256,7 +256,7 @@ static int m6000_mod_symbol(struct m6000 *m, bool bit, COMP mod_out[])
 }
 
 /* We have a frame with symbols (=bits), modulate them */
-static int freedv_6000_mod(struct freedv *f, unsigned char frame[M6000_FRAMESYMBOLS], COMP mod_out[])
+static int freedv_6000_mod(struct freedv *f, unsigned char frame[M6000_FRAMESYMBOLS], short mod_out[])
 {
     int i;
     struct m6000 *m = f->m6000;
@@ -389,7 +389,7 @@ int freedv_6000_rawdata_symtx(struct freedv *f, unsigned char frame[M6000_FRAMES
     return freedv_6000_frametx(f, m6000_sync_voice, payload, frame);
 }
 
-int freedv_6000_rawdata_comptx(struct freedv *f, COMP mod_out[])
+int freedv_6000_rawdata_tx(struct freedv *f, short mod_out[])
 {
     unsigned char frame[M6000_FRAMESYMBOLS];
 
@@ -398,7 +398,7 @@ int freedv_6000_rawdata_comptx(struct freedv *f, COMP mod_out[])
     return freedv_6000_mod(f, frame, mod_out);
 }
 
-int freedv_6000_data_comptx(struct freedv *f, COMP mod_out[])
+int freedv_6000_data_tx(struct freedv *f, short mod_out[])
 {
     unsigned char frame[M6000_FRAMESYMBOLS];
 

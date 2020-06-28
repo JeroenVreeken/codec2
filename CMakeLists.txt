@@ -496,6 +496,11 @@ endif()
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/unittest
              )
 
+     add_test(NAME test_freedv_api_data_6000
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./freedv_data_tx 6000 - --packets 100 | ./freedv_data_rx 6000 -")
+             set_tests_properties(test_freedv_api_data_6000 PROPERTIES PASS_REGULAR_EXPRESSION "packets decoded: 99")
+
 if(UNIX) # Uses pthreads
      add_test(NAME test_fifo
              COMMAND $<TARGET_FILE:tfifo>
