@@ -114,8 +114,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
     if (false == (FDV_MODE_ACTIVE( FREEDV_MODE_1600,mode) || FDV_MODE_ACTIVE( FREEDV_MODE_2400A,mode) || 
 		FDV_MODE_ACTIVE( FREEDV_MODE_2400B,mode) || FDV_MODE_ACTIVE( FREEDV_MODE_800XA,mode) || 
 		FDV_MODE_ACTIVE( FREEDV_MODE_700C,mode) || FDV_MODE_ACTIVE( FREEDV_MODE_700D,mode)  ||
-		FDV_MODE_ACTIVE( FREEDV_MODE_2020,mode) || FDV_MODE_ACTIVE( FREEDV_MODE_6000,mode)) )
-    {
+		FDV_MODE_ACTIVE( FREEDV_MODE_2020,mode) || FDV_MODE_ACTIVE( FREEDV_MODE_6000,mode)) ) {
         return NULL;
     }
 
