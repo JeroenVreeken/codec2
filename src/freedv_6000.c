@@ -26,7 +26,7 @@
 #include "codec2.h"
 #include "debug_alloc.h"
 #include "mpdecode_core.h"
-#include "H_696_232.h"
+#include "ldpc_codes.h"
 
 #include <assert.h>
 
@@ -157,26 +157,6 @@ struct m6000 {
     int demod_sync_nr;
 };
 
-void set_up_h_696_232(struct LDPC *ldpc) {
-    ldpc->max_iter = H_696_232_MAX_ITER;
-    ldpc->dec_type = 0;
-    ldpc->q_scale_factor = 1;
-    ldpc->r_scale_factor = 1;
-    ldpc->CodeLength = H_696_232_CODELENGTH;
-    ldpc->NumberParityBits = H_696_232_NUMBERPARITYBITS;
-    ldpc->NumberRowsHcols = H_696_232_NUMBERROWSHCOLS;
-    ldpc->max_row_weight = H_696_232_MAX_ROW_WEIGHT;
-    ldpc->max_col_weight = H_696_232_MAX_COL_WEIGHT;
-    ldpc->H_rows = (uint16_t *) H_696_232_H_rows;
-    ldpc->H_cols = (uint16_t *) H_696_232_H_cols;
-
-    ldpc->ldpc_data_bits_per_frame = H_696_232_CODELENGTH - H_696_232_NUMBERPARITYBITS;
-    ldpc->ldpc_coded_bits_per_frame = H_696_232_CODELENGTH;
-    
-    ldpc->data_bits_per_frame = ldpc->ldpc_data_bits_per_frame;
-    ldpc->coded_bits_per_frame = ldpc->ldpc_coded_bits_per_frame;
-    ldpc->coded_syms_per_frame = ldpc->coded_bits_per_frame;
-}
 
 void freedv_6000_open(struct freedv *f) 
 {
@@ -210,7 +190,7 @@ void freedv_6000_open(struct freedv *f)
     f->tx_payload_bits = CALLOC(1, n_packed_bytes); assert(f->tx_payload_bits != NULL);
     f->rx_payload_bits = CALLOC(1, n_packed_bytes); assert(f->rx_payload_bits != NULL);
 
-    set_up_h_696_232(f->ldpc);
+    ldpc_codes_setup(f->ldpc, "H_696_232");
 
     f->stats.sync = 0;
 }
@@ -428,14 +408,14 @@ static float m6000_demod_frame_bit_scrambled(struct m6000 *m, int *nr, unsigned 
         return m6000_demod_frame_bit(m, nr);
 }
 
-static int m6000_demod_frame(struct freedv *f, uint8_t out_char[H_696_232_CODELENGTH])
+static int m6000_demod_frame(struct freedv *f, uint8_t out_char[f->ldpc->CodeLength])
 {
     struct m6000 *m = f->m6000;
     int nr = M6000_SYNCSIZE;
     unsigned short scrambler = M6000_SCRAMBLER_SEED;
     int i;
 
-    float input[H_696_232_CODELENGTH];
+    float input[f->ldpc->CodeLength];
 
     for (i = 0; i < M6000_CODEBITS; i++) {
         input[i] = m6000_demod_frame_bit_scrambled(m, &nr, &scrambler);
@@ -450,7 +430,7 @@ static int m6000_demod_frame_data(struct freedv *f)
     struct freedv_data_channel *fdc = f->fdc;
     unsigned char databytes[M6000_FULLDATABYTES] = { 0 };
     
-    uint8_t out_char[H_696_232_CODELENGTH];
+    uint8_t out_char[f->ldpc->CodeLength];
 
     m6000_demod_frame(f, out_char);
 
@@ -491,7 +471,7 @@ static int m6000_demod_frame_voice(struct freedv *f)
     unsigned char *voice = f->rx_payload_bits;
     unsigned char databytes[M6000_SLOWDATABYTES] = { 0 };
     
-    uint8_t out_char[H_696_232_CODELENGTH];
+    uint8_t out_char[f->ldpc->CodeLength];
 
     m6000_demod_frame(f, out_char);
     int out_nr = 0;

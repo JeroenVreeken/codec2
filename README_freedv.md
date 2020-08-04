@@ -78,7 +78,7 @@ These modes use constant amplitude modulation like FSK or FM, and are designed f
 
 ## FreeDV API
 
-See ```freedv_api.h``` and ```freedv_api.c```, and the command line demo programs ```freedv_tx.c``` & ```freedv_rx.c```.  Quickstart demo using FreeDV 1600:
+See [freedv_api.h](src/freedv_api.h) and [freedv_api.c](src/freedv_api.c), and the command line demo programs [freedv_tx.c](src/freedv_tx.c) & [freedv_rx.c](src/freedv_rx.c).  Quickstart demo using FreeDV 1600:
 ```
 $ ./freedv_tx 1600 ../../raw/hts1.raw - | ./freedv_rx 1600 - - | play -t raw -r 8000 -s -2 -q -
 $ cat freedv_rx_log.txt
@@ -133,11 +133,11 @@ $  ./freedv_tx 2400B ../../raw/ve9qrp_10s.raw - | sox -t raw -r 48000 -s -2 - -t
 ## FreeDV 2020 tests with FreeDV API
 
 ```
-$ cat ~/LPCNet/wav/wia.wav | ~/LPCNet/build_linux/src/lpcnet_enc -s | ./ofdm_mod --ts 0.0205 --nc 31 --ldpc 2 --verbose 1 -p 312 | ./ofdm_demod --ts 0.0205 --nc 31 --verbose 1 --ldpc 2 -p 312 | ~/LPCNet/build_linux/src/lpcnet_dec -s | aplay -f S16_LE -r 16000
+$ cat ~/LPCNet/wav/wia.wav | ~/LPCNet/build_linux/src/lpcnet_enc -s | ./ofdm_mod --mode 2020 --ldpc --verbose 1 -p 312 | ./ofdm_demod --mode 2020 --verbose 1 --ldpc -p 312 | ~/LPCNet/build_linux/src/lpcnet_dec -s | aplay -f S16_LE -r 16000
 ```
 Listen the reference tx:
 ```
-$ cat ~/LPCNet/wav/wia.wav | ~/LPCNet/build_linux/src/lpcnet_enc -s | ./ofdm_mod --ts 0.0205 --nc 31 --ldpc 2 --verbose 1 -p 312 | aplay -f S16_LE
+$ cat ~/LPCNet/wav/wia.wav | ~/LPCNet/build_linux/src/lpcnet_enc -s | ./ofdm_mod --mode 2020 --ldpc --verbose 1 -p 312 | aplay -f S16_LE
 ```
 
 Listen the freedv_tx:
@@ -147,7 +147,7 @@ $ ./freedv_tx 2020 ~/LPCNet/wav/wia.wav - | aplay -f S16_LE
 
 FreeDV API tx, with reference rx from above:
 ```
-$ ./freedv_tx 2020 ~/LPCNet/wav/wia.wav - | ./ofdm_demod --ts 0.0205 --nc 31 --verbose 1 --ldpc 2 -p 312 | ~/LPCNet/build_linux/src/lpcnet_dec -s | aplay -f S16_LE -r 16000
+$ ./freedv_tx 2020 ~/LPCNet/wav/wia.wav - | ./ofdm_demod --mode 2020 --verbose 1 --ldpc -p 312 | ~/LPCNet/build_linux/src/lpcnet_dec -s | aplay -f S16_LE -r 16000
 ```
 
 FreeDV API tx and rx:

@@ -5,9 +5,11 @@
   DATE CREATED: August 2014
 
   Library of API functions that implement FreeDV "modes", useful for
-  embedding FreeDV in other programs.  Please see the documentation
-  for each function in freedv_api.c, and the sample freedv_tx.c and
-  freedv_rx.c programs.
+  embedding FreeDV in other programs.  Please see:
+
+  1. README_freedv.md
+  2. Notes function use in freedv_api.c
+  3. The sample freedv_tx.c and freedv_rx.c programs
 
 \*---------------------------------------------------------------------------*/
 
@@ -98,11 +100,11 @@
 // struct that hold state information for one freedv instance
 struct freedv;
 
-// advanced freedv open options rqd by some modes
+// Dummy structure for (currently) deprecated call
 struct freedv_advanced {
     int interleave_frames;
 };
-      
+
 // Called when text message char is decoded
 typedef void (*freedv_callback_rx)(void *, char);
 // Called when new text message char is needed
@@ -131,8 +133,8 @@ typedef void (*freedv_callback_datatx)(void *, unsigned char *packet, size_t *si
 
 // open, close ----------------------------------------------------------------
 
-struct freedv *freedv_open(int mode);
 struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv);
+struct freedv *freedv_open(int mode);
 void freedv_close   (struct freedv *freedv);
 
 // Transmit -------------------------------------------------------------------
@@ -186,10 +188,10 @@ void freedv_set_eq                      (struct freedv *f, int val);
       
 // Get parameters -------------------------------------------------------------------------
 
-
 struct MODEM_STATS;
 
 int freedv_get_version(void);
+char *freedv_get_hash(void);
 int freedv_get_mode                 (struct freedv *freedv);
 void freedv_get_modem_stats         (struct freedv *freedv, int *sync, float *snr_est);
 void freedv_get_modem_extended_stats(struct freedv *freedv, struct MODEM_STATS *stats);
