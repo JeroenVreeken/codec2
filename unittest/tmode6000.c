@@ -88,7 +88,7 @@ int main(int argc, char **argv)
 	printf("Check freedv_get_modem_sample_rate() ");
 	int m_rate = freedv_get_modem_sample_rate(f);
 	if (m_rate != 48000) {
-		printf("modemrate is not 48000\n");
+		printf("modemrate is not 48000: %d\n", m_rate);
 		const_check_failed = true;
 	} else {
 		printf("Passed\n");
@@ -97,7 +97,7 @@ int main(int argc, char **argv)
 	printf("freedv_get_modem_symbol_rate() ");
 	int m_symbolrate = freedv_get_modem_symbol_rate(f);
 	if (m_symbolrate != 6000) {
-		printf("symbolrate is not 6000\n");
+		printf("symbolrate is not 6000: %d\n", m_symbolrate);
 		const_check_failed = true;
 	} else {
 		printf("Passed\n");

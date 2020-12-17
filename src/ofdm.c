@@ -204,6 +204,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
         ofdm->timing_mx_thresh = 0.30f;
         ofdm->data_mode = 0;
         ofdm->codename = "HRA_112_112";
+        memset(ofdm->tx_uw, 0, ofdm->nuwbits);
     } else {
         /* Use the users values */
 
@@ -224,6 +225,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
         ofdm->timing_mx_thresh = config->timing_mx_thresh;
         ofdm->data_mode = config->data_mode;
         ofdm->codename = config->codename;
+        memcpy(ofdm->tx_uw, config->tx_uw, ofdm->nuwbits);
     }
 
     ofdm->rs = (1.0f / ofdm->ts);                 /* Modulation Symbol Rate */
@@ -234,6 +236,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     /* basic sanity checks */
     assert((int)floorf(ofdm->fs / ofdm->rs) == ofdm->m);
     assert((ofdm->data_mode == 0) || (ofdm->data_mode == 1));
+    assert(ofdm->nuwbits <= MAX_UW_BITS);
     
     /* Copy constants into states */
 
@@ -254,6 +257,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->config.ftwindowwidth = ofdm->ftwindowwidth;
     ofdm->config.data_mode = ofdm->data_mode;
     ofdm->config.codename = ofdm->codename;
+    memcpy(ofdm->config.tx_uw, ofdm->tx_uw, ofdm->nuwbits);
     
     /* Calculate sizes from config param */
 
@@ -300,14 +304,6 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
 
     ofdm->aphase_est_pilot_log = MALLOC(sizeof (float) * (ofdm->rowsperframe * ofdm->nc));
     assert(ofdm->aphase_est_pilot_log != NULL);
-
-    /* set up Unique Word */
-    ofdm->tx_uw = MALLOC(sizeof (uint8_t) * ofdm->nuwbits);
-    assert(ofdm->tx_uw != NULL);
-
-    for (i = 0; i < ofdm->nuwbits; i++) {
-        ofdm->tx_uw[i] = 0;
-    }
 
     /* Null pointers to unallocated buffers */
     ofdm->tx_bpf = NULL;
@@ -403,8 +399,12 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->tx_uw_syms = MALLOC(sizeof (complex float) * (ofdm->nuwbits / ofdm->bps));
     assert(ofdm->tx_uw_syms != NULL);
 
-    for (i = 0; i < (ofdm->nuwbits / ofdm->bps); i++) {
-        ofdm->tx_uw_syms[i] = 1.0f;      // qpsk_mod(0:0)
+    assert(ofdm->bps == 2); // TODO generalise
+    for (int s = 0; s < (ofdm->nuwbits / ofdm->bps); s++) {
+        int dibit[2];
+        dibit[1] = ofdm->tx_uw[2*s];
+        dibit[0] = ofdm->tx_uw[2*s+1];
+        ofdm->tx_uw_syms[s] = qpsk_mod(dibit);
     }
 
     /* sync state machine */
@@ -500,7 +500,6 @@ void ofdm_destroy(struct OFDM *ofdm) {
     FREE(ofdm->rx_np);
     FREE(ofdm->rx_amp);
     FREE(ofdm->aphase_est_pilot_log);
-    FREE(ofdm->tx_uw);
     FREE(ofdm->tx_uw_syms);
     FREE(ofdm->uw_ind);
     FREE(ofdm->uw_ind_sym);
@@ -787,12 +786,6 @@ void ofdm_txframe(struct OFDM *ofdm, complex float *tx, complex float *tx_sym_li
         for (j = 0; j < (ofdm->nc + 2); j++) {
             aframe[i][j] = 0.0f;
         }
-    }
-
-    /* copy in a row of complex pilots to first row */
-
-    for (i = 0; i < (ofdm->nc + 2); i++) {
-        aframe[0][i] = ofdm->pilots[i];
     }
 
     /*
@@ -1380,11 +1373,9 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
             }
 
             aphase_est_pilot_rect += vector_sum(symbol, 3);
-            aphase_est_pilot[i] = cargf(aphase_est_pilot_rect);
-
+ 
             /* amplitude is estimated over 12 pilots */
-
-            aamp_est_pilot[i] = cabsf(aphase_est_pilot_rect / 12.0f);
+            aphase_est_pilot_rect /= 12.0f;
         } else {
             assert(ofdm->phase_est_bandwidth == high_bw);
 
@@ -1396,12 +1387,13 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
              */
             aphase_est_pilot_rect = ofdm->rx_sym[1][i] * conjf(ofdm->pilots[i]);            /* "this" pilot conjugate */
             aphase_est_pilot_rect += ofdm->rx_sym[ofdm->ns + 1][i] * conjf(ofdm->pilots[i]); /* "next" pilot conjugate */
-            aphase_est_pilot[i] = cargf(aphase_est_pilot_rect);
 
             /* amplitude is estimated over 2 pilots */
-
-            aamp_est_pilot[i] = cabsf(aphase_est_pilot_rect / 2.0f);
+            aphase_est_pilot_rect /= 2.0f;
         }
+
+        aphase_est_pilot[i] = cargf(aphase_est_pilot_rect);
+        aamp_est_pilot[i] = cabsf(aphase_est_pilot_rect);
     }
 
     /*

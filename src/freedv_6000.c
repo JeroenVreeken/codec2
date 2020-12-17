@@ -164,7 +164,7 @@ void freedv_6000_open(struct freedv *f)
     assert(f->codec2 != NULL);
     
     /* Create modem */
-    f->m6000 = CALLOC(1, sizeof(struct m6000));
+    f->m6000 = CALLOC(1, sizeof(struct m6000)); assert(f->m6000 != NULL);
 
     /* Make sure we don't 'sync' on initial state */
     memset(f->m6000->demod_symbols, 1, sizeof(f->m6000->demod_symbols));
@@ -544,7 +544,7 @@ static int freedv_6000_symrx(struct freedv *f)
     }
     
     int bit_sync_min;
-    if ((m->rx_status & RX_SYNC) == 0)
+    if ((m->rx_status & FREEDV_RX_SYNC) == 0)
         bit_sync_min = M6000_SYNCSIZE;
     else
         bit_sync_min = M6000_SYNCSIZE_MIN;
@@ -558,7 +558,7 @@ static int freedv_6000_symrx(struct freedv *f)
         is_sync_data = true;
 
     if (is_sync_voice || is_sync_data) {
-        m->rx_status = RX_SYNC;
+        m->rx_status = FREEDV_RX_SYNC;
         m->demod_sync_nr = sym_nr;
     } else {
         m->rx_status = 0;
@@ -645,8 +645,8 @@ int freedv_6000_comprx(struct freedv *f, COMP demod_in[])
 	    symval = fminf(symval, 10);
             m->demod_symbols[sym_nr] = copysignf(symval, symbit ? -1.0 : 1.0);
             
-            if ((m->rx_status & RX_SYNC) == 0 ||
-                ((m->rx_status & RX_SYNC) && m->demod_sync_nr == sym_nr)) {
+            if ((m->rx_status & FREEDV_RX_SYNC) == 0 ||
+                ((m->rx_status & FREEDV_RX_SYNC) && m->demod_sync_nr == sym_nr)) {
                 ret = freedv_6000_symrx(f);
             }
         };
@@ -654,7 +654,7 @@ int freedv_6000_comprx(struct freedv *f, COMP demod_in[])
 
     f->nin = M6000_FRAMESIZE + offset;
 
-    f->stats.sync = (m->rx_status & RX_SYNC) != 0;
+    f->stats.sync = (m->rx_status & FREEDV_RX_SYNC) != 0;
 
     float min = 1000.0;
     float max = 0.0;
@@ -667,7 +667,7 @@ int freedv_6000_comprx(struct freedv *f, COMP demod_in[])
 
     int rx_status = m->rx_status;
     if (ret)
-        rx_status |= RX_BITS;
+        rx_status |= FREEDV_RX_BITS;
     return rx_status;
 }
 

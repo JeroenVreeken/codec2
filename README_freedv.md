@@ -75,12 +75,15 @@ These modes use constant amplitude modulation like FSK or FM, and are designed f
 | 2400A | 2016 | 1300 | 4FSK | 2400 | 5kHz | Golay (23,12) | Y |
 | 2400B | 2016 | 1300 | baseband/analog FM | analog FM | 2400 | Golay (23,12) | Y |
 | 800XA | 2017 | 700C |  4FSK | 2000 | 800 | - | N |
+| FSK_LDPC | 2020 | - | 2 or 4 FSK |  user defined | user defined | LDPC | - | - |
+
+The FSK_LDPC mode is used for data, and has user defined bit rate and a variety of LDPC codes available.  It is discussed in [README_data](README_data.md)
 
 ## FreeDV API
 
 See [freedv_api.h](src/freedv_api.h) and [freedv_api.c](src/freedv_api.c), and the command line demo programs [freedv_tx.c](src/freedv_tx.c) & [freedv_rx.c](src/freedv_rx.c).  Quickstart demo using FreeDV 1600:
 ```
-$ ./freedv_tx 1600 ../../raw/hts1.raw - | ./freedv_rx 1600 - - | play -t raw -r 8000 -s -2 -q -
+$ ./freedv_tx 1600 ../../raw/hts1.raw - | ./freedv_rx 1600 - - | aplay -f S16_LE
 $ cat freedv_rx_log.txt
 ```
 ## FreeDV 2400A and 2400B modes
@@ -119,7 +122,7 @@ $  ./freedv_tx 2400B ../../raw/ve9qrp_10s.raw - | sox -t raw -r 48000 -s -2 - -t
    $ cd ~
    $ git clone https://github.com/drowe67/LPCNet
    $ cd LPCNet && mkdir build_linux && cd build_linux
-   $ cmake -DCODEC2_BUILD_DIR=~/codec2/build_linux ../ 
+   $ cmake -DCODEC2_BUILD_DIR=~/codec2/build_linux ../
    $ make
    ```
 
