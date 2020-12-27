@@ -332,6 +332,22 @@ void freedv_tx(struct freedv *f, short mod_out[], short speech_in[]) {
     }
 }
 
+/* Symbol output, needs external shaping before transmit */
+void freedv_symtx(struct freedv *f, signed char sym_out[], short speech_in[])
+{
+    int i;
+    
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_6000, f->mode)) {
+        int speech_per_codec_frame = codec2_samples_per_frame(f->codec2);
+        int bytes_per_codec_frame = (f->bits_per_codec_frame + 7) / 8;
+	
+        for (i=0; i < f->n_codec_frames; i++) {
+            codec2_encode(f->codec2, &f->tx_payload_bits[i*bytes_per_codec_frame], &speech_in[i*speech_per_codec_frame]);
+        }
+        
+        freedv_6000_rawdata_symtx(f, sym_out);
+    }
+}
 
 /* complex float output samples version */
 
@@ -486,6 +502,15 @@ void freedv_rawdatatx(struct freedv *f, short mod_out[], unsigned char *packed_p
         mod_out[i] = mod_out_comp[i].real;
 }
 
+void freedv_rawdatasymtx(struct freedv *f, signed char sym_out[], unsigned char *packed_payload_bits)
+{
+    if(FDV_MODE_ACTIVE( FREEDV_MODE_6000, f->mode)) {
+        memcpy(f->tx_payload_bits, packed_payload_bits, (f->bits_per_modem_frame + 7) / 8);
+        freedv_6000_rawdata_symtx(f, sym_out);
+        return;
+    }
+}
+
 int freedv_rawdatapreamblecomptx(struct freedv *f, COMP mod_out[]) {
     assert(f != NULL);
     assert(f->mode == FREEDV_MODE_FSK_LDPC);
@@ -524,6 +549,14 @@ void freedv_datatx (struct freedv *f, short mod_out[]) {
     }
     if (FDV_MODE_ACTIVE( FREEDV_MODE_6000, f->mode)) {
         freedv_6000_data_tx(f, mod_out);
+    }
+}
+
+/* VHF packet data tx function */
+void freedv_datasymtx (struct freedv *f, signed char sym_out[]) {
+    assert(f != NULL);
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_6000, f->mode)) {
+        freedv_6000_data_symtx(f, sym_out);
     }
 }
 
@@ -730,6 +763,24 @@ int freedv_rx(struct freedv *f, short speech_out[], short demod_in[]) {
     assert(1); /* should never get here */
     return 0;
 }
+
+int freedv_symrx(struct freedv *f, short speech_out[], signed char sym_in[])
+{
+    assert(f != NULL);
+    assert(f->nin <= f->n_max_modem_samples);
+    int rx_status = 0;
+    f->nin_prev = freedv_nin(f);
+
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_6000, f->mode)) {
+        rx_status = freedv_6000_symrx(f, sym_in);
+    }
+
+    short demod_in_short[f->nin_prev];
+    memset(demod_in_short, 0, sizeof(short)*f->nin_prev);
+
+    return freedv_bits_to_speech(f, speech_out, demod_in_short, rx_status);
+}
+
 
 /* complex sample input version from the radio */
 
@@ -1009,6 +1060,24 @@ int freedv_rawdatacomprx(struct freedv *f, unsigned char *packed_payload_bits, C
 
     /* might want to check this for errors, e.g. if reliable data is important */
     f->rx_status= rx_status;
+
+    return ret;
+}
+
+int freedv_rawdatasymrx(struct freedv *f, unsigned char *packed_payload_bits, signed char sym_in[])
+{
+    assert(f != NULL);
+    int ret = 0;
+    int rx_status = 0;
+
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_6000, f->mode)) {
+        rx_status = freedv_6000_symrx(f, sym_in);
+	f->rx_status = rx_status;
+	if (rx_status & FREEDV_RX_BITS) {
+            ret = (f->bits_per_modem_frame + 7 ) / 8;
+            memcpy(packed_payload_bits, f->rx_payload_bits, ret);
+	}
+    }
 
     return ret;
 }
@@ -1340,6 +1409,7 @@ int freedv_get_bits_per_codec_frame       (struct freedv *f) {return f->bits_per
 int freedv_get_bits_per_modem_frame       (struct freedv *f) {return f->bits_per_modem_frame;}
 int freedv_get_rx_status                  (struct freedv *f) {return f->rx_status;}
 void freedv_get_fsk_S_and_N               (struct freedv *f, float *S, float *N) { *S = f->fsk_S[0]; *N = f->fsk_N[0]; }
+int freedv_get_n_modem_symbols            (struct freedv *f) {return f->n_modem_symbols;}
 
 int freedv_get_n_max_speech_samples(struct freedv *f) {
     /* When "passing through" demod samples to the speech output

@@ -180,23 +180,28 @@ void freedv_close   (struct freedv *freedv);
 // Transmit -------------------------------------------------------------------
 
 void freedv_tx             (struct freedv *freedv, short mod_out[], short speech_in[]);
+void freedv_symtx          (struct freedv *f, signed char sym_out[], short speech_in[]);
 void freedv_comptx         (struct freedv *freedv, COMP  mod_out[], short speech_in[]);
 void freedv_datatx         (struct freedv *f, short mod_out[]);
+void freedv_datasymtx      (struct freedv *f, signed char sym_out[]);
 int  freedv_data_ntxframes (struct freedv *freedv);
 void freedv_rawdatatx      (struct freedv *f, short mod_out[], unsigned char *packed_payload_bits);
 void freedv_rawdatacomptx  (struct freedv *f, COMP mod_out[], unsigned char *packed_payload_bits);
 int  freedv_rawdatapreambletx      (struct freedv *f, short mod_out[]);
 int  freedv_rawdatapreamblecomptx  (struct freedv *f, COMP mod_out[]);
+void freedv_rawdatasymtx   (struct freedv *f, signed char sym_out[], unsigned char *packed_payload_bits);
 
 // Receive -------------------------------------------------------------------
 
 int freedv_nin           (struct freedv *freedv);
 int freedv_rx            (struct freedv *freedv, short speech_out[], short demod_in[]);
+int freedv_symrx         (struct freedv *freedv, short speech_out[], signed char sym_in[]);
 int freedv_shortrx       (struct freedv *freedv, short speech_out[], short demod_in[], float gain);
 int freedv_floatrx       (struct freedv *freedv, short speech_out[], float demod_in[]);
 int freedv_comprx        (struct freedv *freedv, short speech_out[], COMP  demod_in[]);
 int freedv_rawdatarx     (struct freedv *freedv, unsigned char *packed_payload_bits, short demod_in[]);
 int freedv_rawdatacomprx (struct freedv *freedv, unsigned char *packed_payload_bits, COMP demod_in[]);
+int freedv_rawdatasymrx  (struct freedv *freedv, unsigned char *packed_payload_bits, signed char sym_in[]);
 
 // Helper functions -------------------------------------------------------------------
 
@@ -258,6 +263,8 @@ int freedv_get_modem_symbol_rate    (struct freedv *freedv);
 int freedv_get_n_max_modem_samples  (struct freedv *freedv);
 int freedv_get_n_nom_modem_samples  (struct freedv *freedv);
 int freedv_get_n_tx_modem_samples   (struct freedv *freedv);
+
+int freedv_get_n_modem_symbols      (struct freedv *freedv); // symbols per frame, used in symtx/symrx functions
 
 // bit error rate stats
 int freedv_get_total_bits	            (struct freedv *freedv);

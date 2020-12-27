@@ -26,6 +26,11 @@ void freedv_6000_close(struct freedv *f);
 int freedv_6000_rawdata_tx(struct freedv *f, short mod_out[]);
 int freedv_6000_data_tx(struct freedv *f, short mod_out[]);
 
+int freedv_6000_rawdata_symtx(struct freedv *f, signed char frame[]);
+int freedv_6000_data_symtx(struct freedv *f, signed char frame[]);
+
 int freedv_6000_comprx(struct freedv *f, COMP demod_in[]);
+
+int freedv_6000_symrx(struct freedv *f, signed char frame[]);
 
 #endif /* _FREEDV_6000_H_ */

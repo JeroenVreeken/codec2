@@ -92,7 +92,8 @@ struct freedv {
     int                  modem_sample_rate;      // Caller is responsible for meeting this
     int                  modem_symbol_rate;      // Useful for ext_vco operation on 2400A and 800XA
     int                  speech_sample_rate;     // 8 kHz or 16 kHz (high fidelity)
-
+    int                  n_modem_symbols;        // symbols per frame
+    
     int                  bits_per_codec_frame;
     int                  bits_per_modem_frame;   // number of modem payload bits in each modem frame (usually compressed speech)
     int                  n_codec_frames;         // number of codec frames in each modem frame

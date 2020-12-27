@@ -156,6 +156,11 @@ int main(int argc, char **argv)
     assert(codec_bits == 384);
     printf("%d Passed\n", codec_bits);
 
+    printf("freedv_get_n_modem_symbols() ");
+    int n_modem_symbols = freedv_get_n_modem_symbols(f);
+    assert(n_modem_symbols == 720);
+    printf("%d Passed\n", n_modem_symbols);
+
     printf("freedv_get_sync() [Initial state check] ");
     int sync = freedv_get_sync(f);
     if (sync) {
@@ -257,6 +262,7 @@ int main(int argc, char **argv)
             printf("sync value %d was unexpected\n", sync);
         }
     }
+    printf("%d %d\n", datarx_called, datarx_from_ok);
     assert(datarx_called == 9);
     assert(datarx_from_ok == 9);
     printf("Passed\n"); /* store: . ........d VVVVVVVVVVV V DDD */
@@ -357,6 +363,43 @@ int main(int argc, char **argv)
     assert(datarx_called == 3);
     assert(datarx_from_ok == 0);
     printf("Passed\n"); 
+
+
+    printf("freedv_close() ");
+    freedv_close(f);
+    printf("Passed\n");
+    
+    // Open new instance for symbol tests
+
+    printf("freedv_open(FREEDV_MODE_6000) ");
+    f = freedv_open(FREEDV_MODE_6000);
+    assert(f != NULL);
+    printf("Passed\n");
+
+    printf("freedv_rawdatasymtx\n");
+    signed char frame_sym[720] = {0};
+    voice_gen(packed_codec_bits);
+    freedv_rawdatasymtx(f, frame_sym, packed_codec_bits);
+
+    printf("freedv_rawdatasymrx\n");
+    memset(packed_codec_bits, 0, sizeof(packed_codec_bits));
+    r = freedv_rawdatasymrx(f, packed_codec_bits, frame_sym);
+    assert(r == 384/8);
+    assert(voice_check(packed_codec_bits) == 0);
+    printf("Passed\n");
+
+    freedv_rawdatasymtx(f, frame_sym, packed_codec_bits);
+
+    printf("freedv_symrx\n");
+    memset(packed_codec_bits, 0, sizeof(packed_codec_bits));
+    r = freedv_symrx(f, speech_out, frame_sym);
+    assert(r == 960);
+
+    memset(frame_sym, 1, sizeof(frame_sym));
+    r = freedv_symrx(f, speech_out, frame_sym);
+    assert(r == 0);
+    r = freedv_rawdatasymrx(f, packed_codec_bits, frame_sym);
+    assert(r == 0);
 
     printf("freedv_close() ");
     freedv_close(f);
