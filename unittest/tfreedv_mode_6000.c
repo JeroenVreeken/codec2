@@ -260,6 +260,7 @@ int main(int argc, char **argv)
         sync = freedv_get_sync(f);
         if (!sync) {
             printf("sync value %d was unexpected\n", sync);
+            goto fail;
         }
     }
     printf("%d %d\n", datarx_called, datarx_from_ok);
@@ -271,6 +272,7 @@ int main(int argc, char **argv)
     sync = freedv_get_sync(f);
     if (!sync) {
         printf("sync value %d was unexpected\n", sync);
+        goto fail;
     }
     printf("Passed\n");
 
@@ -358,6 +360,7 @@ int main(int argc, char **argv)
         sync = freedv_get_sync(f);
         if (!sync) {
             printf("sync value %d was unexpected\n", sync);
+            goto fail;
         }
     }
     assert(datarx_called == 3);
@@ -394,12 +397,28 @@ int main(int argc, char **argv)
     memset(packed_codec_bits, 0, sizeof(packed_codec_bits));
     r = freedv_symrx(f, speech_out, frame_sym);
     assert(r == 960);
+    sync = freedv_get_sync(f);
+    if (!sync) {
+        printf("sync value %d was unexpected\n", sync);
+        goto fail;
+    }
 
     memset(frame_sym, 1, sizeof(frame_sym));
     r = freedv_symrx(f, speech_out, frame_sym);
+    sync = freedv_get_sync(f);
     assert(r == 0);
+    if (sync) {
+        printf("sync value %d was unexpected\n", sync);
+        goto fail;
+    }
+
     r = freedv_rawdatasymrx(f, packed_codec_bits, frame_sym);
     assert(r == 0);
+    sync = freedv_get_sync(f);
+    if (sync) {
+        printf("sync value %d was unexpected\n", sync);
+        goto fail;
+    }
 
     printf("freedv_close() ");
     freedv_close(f);
